@@ -1,4 +1,5 @@
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from groundshift.core.aggregator import aggregate_modifiers
 from groundshift.models.bounding_box import BoundingBox
@@ -86,16 +87,14 @@ def test_output_score_is_clamped_to_0_1_on_overflow():
 
 # ── Property tests ────────────────────────────────────────────────────────────
 
+
 @given(
     base_score=st.floats(0.0, 1.0, allow_nan=False),
     modifier_values=st.lists(st.floats(-1.0, 1.0, allow_nan=False), min_size=0, max_size=10),
     confidence_values=st.lists(st.floats(0.0, 1.0, allow_nan=False), min_size=0, max_size=10),
 )
 def test_output_score_always_in_0_1(base_score, modifier_values, confidence_values):
-    modifiers = [
-        _modifier(v, c)
-        for v, c in zip(modifier_values, confidence_values)
-    ]
+    modifiers = [_modifier(v, c) for v, c in zip(modifier_values, confidence_values)]
     score, _ = aggregate_modifiers(base_score=base_score, modifiers=modifiers)
     assert 0.0 <= score <= 1.0
 
@@ -106,9 +105,6 @@ def test_output_score_always_in_0_1(base_score, modifier_values, confidence_valu
     confidence_values=st.lists(st.floats(0.0, 1.0, allow_nan=False), min_size=1, max_size=10),
 )
 def test_output_confidence_always_in_0_1(base_score, modifier_values, confidence_values):
-    modifiers = [
-        _modifier(v, c)
-        for v, c in zip(modifier_values, confidence_values)
-    ]
+    modifiers = [_modifier(v, c) for v, c in zip(modifier_values, confidence_values)]
     _, confidence = aggregate_modifiers(base_score=base_score, modifiers=modifiers)
     assert 0.0 <= confidence <= 1.0

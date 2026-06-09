@@ -17,7 +17,8 @@ def aggregate_modifiers(
         # Cap it so no single plugin can swing the score by more than
         # max_single_plugin_impact * base_score.
         raw_impact = m.modifier_value * m.confidence
-        cap = max_single_plugin_impact * abs(base_score) if base_score != 0 else max_single_plugin_impact
+        base_magnitude = abs(base_score) if base_score != 0 else 1.0
+        cap = max_single_plugin_impact * base_magnitude
         capped_impact = max(-cap, min(cap, raw_impact))
         adjustment += capped_impact * m.confidence
         total_weight += m.confidence

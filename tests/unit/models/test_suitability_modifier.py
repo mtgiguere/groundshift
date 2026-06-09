@@ -3,7 +3,6 @@ import pytest
 from groundshift.models.bounding_box import BoundingBox
 from groundshift.models.suitability_modifier import SuitabilityModifier
 
-
 REGION = BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=42.0, max_lat=15.0)
 
 
@@ -24,30 +23,46 @@ def test_suitability_modifier_stores_fields():
 def test_suitability_modifier_raises_if_modifier_value_above_1():
     with pytest.raises(ValueError, match="modifier_value"):
         SuitabilityModifier(
-            plugin_id="x", region=REGION, modifier_value=1.01,
-            confidence=0.5, geometry=None, metadata={},
+            plugin_id="x",
+            region=REGION,
+            modifier_value=1.01,
+            confidence=0.5,
+            geometry=None,
+            metadata={},
         )
 
 
 def test_suitability_modifier_raises_if_modifier_value_below_minus_1():
     with pytest.raises(ValueError, match="modifier_value"):
         SuitabilityModifier(
-            plugin_id="x", region=REGION, modifier_value=-1.01,
-            confidence=0.5, geometry=None, metadata={},
+            plugin_id="x",
+            region=REGION,
+            modifier_value=-1.01,
+            confidence=0.5,
+            geometry=None,
+            metadata={},
         )
 
 
 def test_suitability_modifier_raises_if_confidence_above_1():
     with pytest.raises(ValueError, match="confidence"):
         SuitabilityModifier(
-            plugin_id="x", region=REGION, modifier_value=0.0,
-            confidence=1.01, geometry=None, metadata={},
+            plugin_id="x",
+            region=REGION,
+            modifier_value=0.0,
+            confidence=1.01,
+            geometry=None,
+            metadata={},
         )
 
 
 def test_suitability_modifier_raises_if_confidence_below_0():
     with pytest.raises(ValueError, match="confidence"):
         SuitabilityModifier(
-            plugin_id="x", region=REGION, modifier_value=0.0,
-            confidence=-0.01, geometry=None, metadata={},
+            plugin_id="x",
+            region=REGION,
+            modifier_value=0.0,
+            confidence=-0.01,
+            geometry=None,
+            metadata={},
         )
