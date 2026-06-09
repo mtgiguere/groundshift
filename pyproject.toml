@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "groundshift"
+version = "0.1.0"
+description = "Open geospatial intelligence platform for crop climate suitability"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "pip-audit>=2.7",
+    "hypothesis>=6.100",
+]
+
+[project.scripts]
+groundshift = "groundshift.cli:main"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: pure logic tests, no I/O",
+    "integration: requires live database and credentials",
+]
+testpaths = ["tests"]
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["groundshift"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90

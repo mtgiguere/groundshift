@@ -1,0 +1,59 @@
+# ── Claude Code ───────────────────────────────────────────────────────────────
+# TDD_CONTRACT.md is an instruction file for Claude Code sessions, not project docs.
+TDD_CONTRACT.md
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+MANIFEST
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Environment / secrets ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# ── Ruff ──────────────────────────────────────────────────────────────────────
+.ruff_cache/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs/
+
+# ── Large geospatial data files ────────────────────────────────────────────────
+*.tif
+*.tiff
+*.geotiff
+*.nc
+*.h5
+*.hdf5
+*.mbtiles
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
