@@ -198,6 +198,17 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. Phase 1 (Describe) targeting completion Q3 2026. See the project board for current sprint status.
+Active development. Core data models and plugin modifier aggregation are implemented and fully tested. Phase 1 (Describe) — climate envelope scoring and imagery pipeline — is next.
+
+| Component | Status |
+|---|---|
+| Core models (BoundingBox, TimeRange, SuitabilityModifier, LayerData, PluginMetadata) | ✓ Complete |
+| Plugin modifier aggregator | ✓ Complete |
+| Plugin base class (GroundshiftPlugin ABC) | In progress |
+| Climate envelope scorer | Planned |
+| Sentinel-2 / Landsat imagery pipeline | Planned |
+| CMIP6 projection pipeline | Planned |
+| Opportunity zone detector (Phase 3) | Planned |
+| REST API | Planned |
 
 *Built with the belief that information equity is a precondition for climate adaptation justice.*

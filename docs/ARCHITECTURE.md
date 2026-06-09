@@ -101,7 +101,7 @@ groundshift/
 │   │   │   ├── gain_zone_detector.py    # Phase 3 — stub; interface defined
 │   │   │   ├── loss_zone_detector.py    # Phase 3 — stub; interface defined
 │   │   │   └── transition_recommender.py # Phase 3 — stub; interface defined
-│   │   └── aggregator.py                # Plugin modifier aggregation
+│   │   └── aggregator.py                # ✓ implemented — confidence-weighted modifier aggregation
 │   │
 │   ├── api/
 │   │   ├── app.py                       # FastAPI application entry point
@@ -127,10 +127,11 @@ groundshift/
 │   │       └── cooperative_infra/       # Stub
 │   │
 │   ├── models/
-│   │   ├── layer_data.py                # Typed spatial data containers
-│   │   ├── suitability_modifier.py      # Plugin output contract
-│   │   ├── bounding_box.py
-│   │   └── time_range.py
+│   │   ├── bounding_box.py              # ✓ implemented
+│   │   ├── layer_data.py                # ✓ implemented — typed spatial data container
+│   │   ├── plugin_metadata.py           # ✓ implemented — plugin identity and requirements
+│   │   ├── suitability_modifier.py      # ✓ implemented — plugin output contract
+│   │   └── time_range.py               # ✓ implemented
 │   │
 │   ├── db/
 │   │   ├── migrations/                  # Alembic migrations
@@ -152,8 +153,10 @@ groundshift/
 │
 ├── tests/
 │   ├── unit/
-│   ├── integration/
-│   └── fixtures/
+│   │   ├── core/                        # ✓ test_aggregator.py
+│   │   └── models/                      # ✓ test_bounding_box, time_range, suitability_modifier, layer_data, plugin_metadata
+│   ├── integration/                     # requires live PostGIS — not yet written
+│   └── fixtures/                        # synthetic datasets — not yet written
 │
 ├── docs/
 │   ├── ARCHITECTURE.md                  # This file
