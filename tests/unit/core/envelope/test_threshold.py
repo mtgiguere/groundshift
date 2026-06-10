@@ -1,4 +1,6 @@
+import numpy as np
 import pytest
+import xarray as xr
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -86,6 +88,32 @@ def test_threshold_with_no_upper_ramp_scores_viable_max_as_zero():
     t = ClimateThreshold(viable_min=15.0, optimal_min=18.0, optimal_max=30.0, viable_max=30.0)
     assert t.score(30.0) == 1.0
     assert t.score(30.1) == 0.0
+
+
+# ── DataArray support ─────────────────────────────────────────────────────────
+
+
+def test_threshold_score_on_dataarray_returns_dataarray():
+    result = _COFFEE_TEMP.score(xr.DataArray(np.array([[21.0, 14.9], [16.5, 27.0]])))
+    assert isinstance(result, xr.DataArray)
+
+
+def test_threshold_score_on_dataarray_scores_each_cell_correctly():
+    # 21.0=optimal(1.0), 14.9=below viable(0.0), 16.5=lower ramp(0.5), 27.0=upper ramp(0.5)
+    grid = xr.DataArray(np.array([[21.0, 14.9], [16.5, 27.0]]))
+    result = _COFFEE_TEMP.score(grid)
+    assert float(result[0, 0]) == pytest.approx(1.0)
+    assert float(result[0, 1]) == pytest.approx(0.0)
+    assert float(result[1, 0]) == pytest.approx(0.5)
+    assert float(result[1, 1]) == pytest.approx(0.5)
+
+
+def test_threshold_score_on_dataarray_matches_scalar_results():
+    values = [14.9, 16.5, 18.0, 21.0, 24.0, 27.0, 30.1]
+    grid = xr.DataArray(np.array(values))
+    result = _COFFEE_TEMP.score(grid)
+    for i, v in enumerate(values):
+        assert float(result[i]) == pytest.approx(_COFFEE_TEMP.score(v))
 
 
 @given(
