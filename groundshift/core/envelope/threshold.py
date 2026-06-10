@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+import xarray as xr
+
 
 @dataclass
 class ClimateThreshold:
@@ -8,7 +10,12 @@ class ClimateThreshold:
     optimal_max: float
     viable_max: float
 
-    def score(self, value: float) -> float:
+    def score(self, value: float | xr.DataArray) -> float | xr.DataArray:
+        if isinstance(value, xr.DataArray):
+            return xr.apply_ufunc(self._score_scalar, value, vectorize=True)
+        return self._score_scalar(value)
+
+    def _score_scalar(self, value: float) -> float:
         if value < self.viable_min or value > self.viable_max:
             return 0.0
         if self.optimal_min <= value <= self.optimal_max:
