@@ -7,6 +7,7 @@ import numpy as np
 
 from groundshift.core.calibration.anchor_loader import load_anchors_from_profile
 from groundshift.core.calibration.anchor_scorer import score_anchors
+from groundshift.core.envelope.era5_source import ERA5Source
 from groundshift.core.envelope.worldclim_source import WorldClimSource
 from groundshift.core.envelope.yaml_loader import load_profile_from_yaml
 from groundshift.core.phases.describe import DescribePhaseRunner
@@ -14,13 +15,11 @@ from groundshift.models.time_range import TimeRange
 from groundshift.plugins.registry import PluginRegistry
 from groundshift.regions.resolver import UnknownRegionError, resolve_region
 
-# WorldClim data is always fetched from this directory.
-# Run scripts/ingest/download_worldclim.py if it is missing.
 _WORLDCLIM_DIR = Path(__file__).parents[1] / "data" / "worldclim" / "10m"
+_ERA5_DIR = Path(__file__).parents[1] / "data" / "era5"
 
-# WorldClim is a 1970-2000 climatological baseline; time_range is required
-# by the interface but ignored by WorldClimSource.
-_BASELINE_TIME_RANGE = TimeRange(start=datetime(1970, 1, 1), end=datetime(2000, 12, 31))
+_WORLDCLIM_TIME_RANGE = TimeRange(start=datetime(1970, 1, 1), end=datetime(2000, 12, 31))
+_ERA5_TIME_RANGE = TimeRange(start=datetime(2015, 1, 1), end=datetime(2024, 12, 31))
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -39,6 +38,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=["describe"],
         help="Pipeline phase to execute.",
     )
+    run.add_argument(
+        "--source",
+        default="worldclim",
+        choices=["worldclim", "era5"],
+        help="Climate data source (default: worldclim).",
+    )
     return parser
 
 
@@ -56,9 +61,14 @@ def run_describe(args: argparse.Namespace) -> None:
         raise SystemExit(f"Crop profile not found: {profile_path}")
 
     profile = load_profile_from_yaml(profile_path)
-    source = WorldClimSource(_WORLDCLIM_DIR)
+    if getattr(args, "source", "worldclim") == "era5":
+        source = ERA5Source(_ERA5_DIR)
+        time_range = _ERA5_TIME_RANGE
+    else:
+        source = WorldClimSource(_WORLDCLIM_DIR)
+        time_range = _WORLDCLIM_TIME_RANGE
     runner = DescribePhaseRunner(source, PluginRegistry())
-    result = runner.run(profile, region, _BASELINE_TIME_RANGE)
+    result = runner.run(profile, region, time_range)
 
     score = result.score.values
     finite = score[~np.isnan(score)]

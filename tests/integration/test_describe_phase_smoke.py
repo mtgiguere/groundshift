@@ -1,13 +1,17 @@
 """
-End-to-end smoke tests for the Describe phase using real WorldClim data.
+End-to-end smoke tests for the Describe phase using real WorldClim and ERA5 data.
 
-These tests confirm that the full pipeline chain — WorldClimSource →
+These tests confirm that the full pipeline chain — ClimateDataSource →
 compute_envelope → DescribePhaseRunner — works correctly with actual
-GeoTIFF files, catching any integration gaps that synthetic unit tests
+data files, catching any integration gaps that synthetic unit tests
 cannot see (nodata handling, coordinate propagation, real value ranges).
 
 Requires WorldClim data on disk. If missing, run:
     python scripts/ingest/download_worldclim.py
+
+ERA5 tests are skipped automatically if ERA5 data is not present. To download:
+    pip install -e ".[ingest]"
+    python scripts/ingest/download_era5.py
 """
 
 from datetime import datetime
@@ -26,6 +30,7 @@ from groundshift.models.time_range import TimeRange
 from groundshift.plugins.registry import PluginRegistry
 
 _DATA_DIR = Path(__file__).parents[2] / "data" / "worldclim" / "10m"
+_ERA5_DIR = Path(__file__).parents[2] / "data" / "era5"
 _PROFILE_PATH = Path(__file__).parents[2] / "crop_profiles" / "coffee_arabica.yaml"
 
 # WorldClim is a 1970–2000 climatological baseline; time_range is required
@@ -147,3 +152,39 @@ def test_cli_prints_alert_when_anchor_scores_below_threshold(_skip_if_no_data, c
     # This test just asserts the CLI doesn't raise; anchor output is already
     # verified by test_cli_prints_calibration_anchor_scores above.
     run_describe(args)
+
+
+@pytest.fixture(scope="module")
+def _skip_if_no_era5_data():
+    if not _ERA5_DIR.exists() or not any(_ERA5_DIR.glob("*.nc")):
+        pytest.skip(
+            f"ERA5 data not found at {_ERA5_DIR} — "
+            "run: pip install -e '.[ingest]' && python scripts/ingest/download_era5.py"
+        )
+
+
+@pytest.mark.integration
+def test_cli_era5_source_runs_end_to_end(_skip_if_no_era5_data, capsys):
+    # ERA5 is a second ClimateDataSource implementation; verify the CLI
+    # --source era5 flag wires it through the full pipeline without error.
+    from groundshift.cli import build_arg_parser, run_describe
+
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "run",
+            "--crop",
+            "coffee",
+            "--region",
+            "ethiopia",
+            "--phase",
+            "describe",
+            "--source",
+            "era5",
+        ]
+    )
+    run_describe(args)
+
+    captured = capsys.readouterr()
+    assert "score" in captured.out.lower()
+    assert "ethiopia" in captured.out.lower()
