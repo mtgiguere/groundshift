@@ -1,4 +1,6 @@
+import numpy as np
 import pytest
+import xarray as xr
 
 from groundshift.models.bounding_box import BoundingBox
 from groundshift.models.suitability_modifier import SuitabilityModifier
@@ -6,84 +8,62 @@ from groundshift.models.suitability_modifier import SuitabilityModifier
 REGION = BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=42.0, max_lat=15.0)
 
 
-def test_suitability_modifier_stores_fields():
-    modifier = SuitabilityModifier(
+def _da(value: float) -> xr.DataArray:
+    return xr.DataArray(np.full((2, 2), value))
+
+
+def _make_modifier(**kwargs) -> SuitabilityModifier:
+    defaults = dict(
         plugin_id="groundwater",
         region=REGION,
-        modifier_value=-0.3,
-        confidence=0.7,
-        geometry=None,
+        factor_value=_da(0.7),
+        probability=_da(1.0),
+        confidence=_da(0.8),
         metadata={"source": "GRACE"},
     )
-    assert modifier.plugin_id == "groundwater"
-    assert modifier.modifier_value == -0.3
-    assert modifier.confidence == 0.7
+    return SuitabilityModifier(**{**defaults, **kwargs})
 
 
-def test_suitability_modifier_raises_if_modifier_value_above_1():
-    with pytest.raises(ValueError, match="modifier_value"):
-        SuitabilityModifier(
-            plugin_id="x",
-            region=REGION,
-            modifier_value=1.01,
-            confidence=0.5,
-            geometry=None,
-            metadata={},
-        )
+def test_suitability_modifier_stores_fields():
+    m = _make_modifier()
+    assert m.plugin_id == "groundwater"
+    assert m.region == REGION
+    assert float(m.factor_value.mean()) == pytest.approx(0.7)
+    assert float(m.probability.mean()) == pytest.approx(1.0)
+    assert float(m.confidence.mean()) == pytest.approx(0.8)
 
 
-def test_suitability_modifier_raises_if_modifier_value_below_minus_1():
-    with pytest.raises(ValueError, match="modifier_value"):
-        SuitabilityModifier(
-            plugin_id="x",
-            region=REGION,
-            modifier_value=-1.01,
-            confidence=0.5,
-            geometry=None,
-            metadata={},
-        )
+def test_suitability_modifier_raises_if_factor_value_above_1():
+    with pytest.raises(ValueError, match="factor_value"):
+        _make_modifier(factor_value=_da(1.01))
+
+
+def test_suitability_modifier_raises_if_factor_value_below_0():
+    with pytest.raises(ValueError, match="factor_value"):
+        _make_modifier(factor_value=_da(-0.01))
+
+
+def test_suitability_modifier_raises_if_probability_above_1():
+    with pytest.raises(ValueError, match="probability"):
+        _make_modifier(probability=_da(1.01))
+
+
+def test_suitability_modifier_raises_if_probability_below_0():
+    with pytest.raises(ValueError, match="probability"):
+        _make_modifier(probability=_da(-0.01))
 
 
 def test_suitability_modifier_raises_if_confidence_above_1():
     with pytest.raises(ValueError, match="confidence"):
-        SuitabilityModifier(
-            plugin_id="x",
-            region=REGION,
-            modifier_value=0.0,
-            confidence=1.01,
-            geometry=None,
-            metadata={},
-        )
+        _make_modifier(confidence=_da(1.01))
 
 
 def test_suitability_modifier_raises_if_confidence_below_0():
     with pytest.raises(ValueError, match="confidence"):
-        SuitabilityModifier(
-            plugin_id="x",
-            region=REGION,
-            modifier_value=0.0,
-            confidence=-0.01,
-            geometry=None,
-            metadata={},
-        )
+        _make_modifier(confidence=_da(-0.01))
 
 
-@pytest.mark.parametrize(
-    "modifier_value,confidence",
-    [
-        (1.0, 1.0),
-        (-1.0, 0.0),
-        (0.0, 0.5),
-    ],
-)
-def test_suitability_modifier_accepts_exact_boundary_values(modifier_value, confidence):
-    modifier = SuitabilityModifier(
-        plugin_id="x",
-        region=REGION,
-        modifier_value=modifier_value,
-        confidence=confidence,
-        geometry=None,
-        metadata={},
-    )
-    assert modifier.modifier_value == modifier_value
-    assert modifier.confidence == confidence
+@pytest.mark.parametrize("factor_value", [0.0, 0.5, 1.0])
+def test_suitability_modifier_accepts_boundary_factor_values(factor_value):
+    m = _make_modifier(factor_value=_da(factor_value))
+    assert float(m.factor_value.mean()) == pytest.approx(factor_value)

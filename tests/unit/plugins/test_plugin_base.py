@@ -70,8 +70,8 @@ def test_score_returns_valid_suitability_modifier(make_plugin):
     layer = plugin.fetch_data(REGION, TIME_RANGE)
     result = plugin.score(layer, {})
     assert isinstance(result, SuitabilityModifier)
-    assert -1.0 <= result.modifier_value <= 1.0
-    assert 0.0 <= result.confidence <= 1.0
+    assert 0.0 <= float(result.factor_value.min()) <= float(result.factor_value.max()) <= 1.0
+    assert 0.0 <= float(result.confidence.min()) <= float(result.confidence.max()) <= 1.0
 
 
 def test_describe_returns_nonempty_string(make_plugin):
