@@ -88,24 +88,26 @@ groundshift/
 ├── groundshift/                  # Core Python package
 │   ├── core/
 │   │   ├── envelope/
-│   │   │   ├── threshold.py             # ✓ implemented — ClimateThreshold trapezoid scoring
-│   │   │   ├── scorer.py                # ✓ implemented — EnvelopeScorer (Liebig's min across variables)
-│   │   │   ├── profile_loader.py        # ✓ implemented — envelope_scorer_from_profile(dict)
-│   │   │   ├── yaml_loader.py           # ✓ implemented — load_profile_from_yaml(Path) I/O wrapper
-│   │   │   ├── cmip6_projector.py       # CMIP6 scenario projection
-│   │   │   └── soil_matcher.py          # SoilGrids integration
+│   │   │   ├── threshold.py             # ✓ ClimateThreshold — trapezoid scoring, float | DataArray
+│   │   │   ├── scorer.py                # ✓ EnvelopeScorer — Liebig's min, float | DataArray
+│   │   │   ├── profile_loader.py        # ✓ envelope_scorer_from_profile(dict) → EnvelopeScorer
+│   │   │   ├── yaml_loader.py           # ✓ load_profile_from_yaml(Path) → dict — I/O boundary
+│   │   │   ├── climate_source.py        # ✓ ClimateDataSource ABC — fetch(variable, region, time_range)
+│   │   │   ├── climate_envelope.py      # ✓ compute_envelope(profile, source, region, time_range) → DataArray
+│   │   │   ├── cmip6_projector.py       # CMIP6 scenario projection — planned
+│   │   │   └── soil_matcher.py          # SoilGrids integration — planned
 │   │   ├── imagery/
-│   │   │   ├── sentinel2_pipeline.py    # Sentinel-2 ingestion + compositing
-│   │   │   ├── landsat_archive.py       # Landsat historical access
-│   │   │   ├── ndvi_analyzer.py         # NDVI/EVI computation + thresholds
-│   │   │   └── change_detector.py       # Multi-temporal change detection
+│   │   │   ├── sentinel2_pipeline.py    # Sentinel-2 ingestion + compositing — planned
+│   │   │   ├── landsat_archive.py       # Landsat historical access — planned
+│   │   │   ├── ndvi_analyzer.py         # NDVI/EVI computation + thresholds — planned
+│   │   │   └── change_detector.py       # Multi-temporal change detection — planned
 │   │   ├── opportunity/
-│   │   │   ├── emergence_detector.py    # Phase 3 — stub; interface defined
-│   │   │   ├── gain_zone_detector.py    # Phase 3 — stub; interface defined
-│   │   │   ├── loss_zone_detector.py    # Phase 3 — stub; interface defined
-│   │   │   └── transition_recommender.py # Phase 3 — stub; interface defined
-│   │   ├── aggregator.py                # ✓ implemented — confidence-weighted modifier aggregation
-│   │   └── scorer.py                    # ✓ implemented — runs registry plugins, returns SuitabilityResult
+│   │   │   ├── emergence_detector.py    # Phase 3 — planned
+│   │   │   ├── gain_zone_detector.py    # Phase 3 — planned
+│   │   │   ├── loss_zone_detector.py    # Phase 3 — planned
+│   │   │   └── transition_recommender.py # Phase 3 — planned
+│   │   ├── aggregator.py                # ✓ three-tier aggregation (existential/stress/custom), envelope gate
+│   │   └── scorer.py                    # ✓ runs registry plugins against envelope, returns SuitabilityResult
 │   │
 │   ├── api/
 │   │   ├── app.py                       # FastAPI application entry point
@@ -117,26 +119,23 @@ groundshift/
 │   │       └── packages.py              # GET /packages/{crop}/{region}
 │   │
 │   ├── plugins/
-│   │   ├── base.py                      # ✓ implemented — GroundshiftPlugin ABC (5-method contract)
-│   │   ├── registry.py                  # ✓ implemented — register, get, list_plugins; duplicate guard
-│   │   ├── builtin/
-│   │   │   ├── climate_envelope/        # Always runs
-│   │   │   └── imagery/                 # Always runs
-│   │   └── stretch/
-│   │       ├── pest_disease/            # Interface defined, impl in progress
-│   │       ├── frost_risk/              # Interface defined, impl in progress
-│   │       ├── groundwater/             # Stub
-│   │       ├── phenology/               # Stub
-│   │       ├── land_tenure/             # Stub
-│   │       └── cooperative_infra/       # Stub
+│   │   ├── base.py                      # ✓ GroundshiftPlugin ABC (5-method contract)
+│   │   ├── registry.py                  # ✓ register, get, list_plugins; duplicate guard
+│   │   └── stretch/                     # Modifier plugins (operate inside the envelope gate)
+│   │       ├── pest_disease/            # Planned
+│   │       ├── frost_risk/              # Planned
+│   │       ├── groundwater/             # Planned
+│   │       ├── phenology/               # Planned
+│   │       ├── land_tenure/             # Planned
+│   │       └── cooperative_infra/       # Planned
 │   │
 │   ├── models/
-│   │   ├── bounding_box.py              # ✓ implemented
-│   │   ├── layer_data.py                # ✓ implemented — typed spatial data container
-│   │   ├── plugin_metadata.py           # ✓ implemented — plugin identity and requirements
-│   │   ├── suitability_modifier.py      # ✓ implemented — plugin output contract
-│   │   ├── suitability_result.py        # ✓ implemented — NamedTuple returned by aggregator and Scorer
-│   │   └── time_range.py               # ✓ implemented
+│   │   ├── bounding_box.py              # ✓ WGS84 bounding box with validation
+│   │   ├── layer_data.py                # ✓ typed spatial data container (data: xr.DataArray)
+│   │   ├── plugin_metadata.py           # ✓ plugin identity, threat_tier, custom_weight
+│   │   ├── suitability_modifier.py      # ✓ factor_value/probability/confidence as DataArrays
+│   │   ├── suitability_result.py        # ✓ score/confidence as DataArrays
+│   │   └── time_range.py               # ✓ start/end with scenario and horizon support
 │   │
 │   ├── db/
 │   │   ├── migrations/                  # Alembic migrations
@@ -158,12 +157,12 @@ groundshift/
 │
 ├── tests/
 │   ├── unit/
-│   │   ├── conftest.py                  # ✓ shared make_plugin fixture factory
+│   │   ├── conftest.py                  # ✓ make_plugin fixture (DataArray fields, threat_tier)
 │   │   ├── core/
-│   │   │   ├── envelope/                # ✓ test_threshold.py, test_envelope_scorer.py, test_profile_loader.py
-│   │   │   ├── test_aggregator.py       # ✓
+│   │   │   ├── envelope/                # ✓ test_threshold, test_envelope_scorer, test_profile_loader, test_climate_envelope
+│   │   │   ├── test_aggregator.py       # ✓ three-tier logic, probability/expected value, property tests
 │   │   │   └── test_scorer.py           # ✓
-│   │   ├── models/                      # ✓ test_bounding_box, time_range, suitability_modifier, layer_data, plugin_metadata
+│   │   ├── models/                      # ✓ all models covered
 │   │   └── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   ├── integration/                     # requires live PostGIS — not yet written
 │   └── fixtures/                        # synthetic datasets — not yet written
@@ -567,6 +566,47 @@ All operations are element-wise on DataArrays. The final output is a spatially c
 
 ---
 
+## Envelope Pipeline Step
+
+The climate envelope is computed as an explicit pipeline step **before** `Scorer.run()` — it is not a plugin and is not registered in `PluginRegistry`.
+
+```python
+# Pseudocode for a Describe phase run
+profile       = load_profile_from_yaml(path)
+envelope      = compute_envelope(profile, climate_source, region, time_range)
+result        = scorer.run(envelope, region, time_range, profile)
+```
+
+`compute_envelope` builds an `EnvelopeScorer` from the crop profile, fetches each required climate variable from the `ClimateDataSource`, and returns the suitability surface as a `DataArray`.
+
+### ClimateDataSource
+
+`ClimateDataSource` is an ABC that abstracts where climate variable grids come from. Any concrete implementation provides one method:
+
+```python
+class ClimateDataSource(ABC):
+    @abstractmethod
+    def fetch(
+        self,
+        variable: str,
+        region: BoundingBox,
+        time_range: TimeRange,
+    ) -> xr.DataArray:
+        """Return a DataArray of values for the named variable over the region."""
+```
+
+Planned implementations:
+
+| Implementation | Data | Phase |
+|---|---|---|
+| `WorldClimSource` | Historical baseline climatology (1970–2000) | Describe |
+| `ERA5Source` | Recent observed climate (2015–present) | Describe |
+| `CMIP6Source` | Projected climate under SSP2/SSP5 scenarios | Predict |
+
+Each implementation clips to the requested `BoundingBox`, reprojects to EPSG:4326, and returns a consistently named DataArray. The pipeline is indifferent to which source is used — swap `WorldClimSource` for `CMIP6Source` and the same `compute_envelope` call produces a projected suitability surface instead of a current one.
+
+---
+
 ## Plugin Architecture
 
 See [PLUGIN.md](PLUGIN.md) for the full plugin development guide.
@@ -627,15 +667,17 @@ from groundshift.core.utils.raster import geodataframe_to_modifier
 class SuitabilityModifier:
     plugin_id:    str
     region:       BoundingBox
-    factor_value: xr.DataArray   # [0.0, 1.0] — severity if stressor occurs
+    factor_value: xr.DataArray   # [0.0, 1.0] — severity if stressor occurs (0 = catastrophic)
     probability:  xr.DataArray   # [0.0, 1.0] — likelihood stressor occurs
-    confidence:   xr.DataArray   # [0.0, 1.0] — certainty of estimates
-    metadata:     dict
+    confidence:   xr.DataArray   # [0.0, 1.0] — certainty of the estimates
+    metadata:     dict           # must include "threat_tier"; "custom_weight" for custom tier
 ```
+
+`threat_tier` and `custom_weight` are declared on `PluginMetadata` and copied into `metadata` by the plugin. The aggregator reads them there to route each modifier into the correct tier.
 
 ### Modifier Aggregation
 
-The aggregator applies the three-tier formula (see Suitability Model section). It accepts the envelope surface and a list of plugin modifiers, and returns a `SuitabilityResult` containing the final score surface and an aggregate confidence surface.
+The aggregator applies the three-tier formula (see Suitability Model section). It accepts the envelope surface produced by `compute_envelope` and a list of plugin modifiers, returning a `SuitabilityResult` containing the final score surface and aggregate confidence surface — both as DataArrays.
 
 ```python
 def aggregate_modifiers(
@@ -645,11 +687,11 @@ def aggregate_modifiers(
     """
     Returns SuitabilityResult(score, confidence) as DataArrays.
     Envelope is the hard ceiling — zero envelope cells are always zero output.
-    Plugins are routed by threat_tier declared in their metadata.
+    Plugins are routed by threat_tier in their metadata dict.
     """
 ```
 
-`Scorer.run()` delegates directly to `aggregate_modifiers`. Plugins whose `validate_config` returns `False` are skipped — their `fetch_data` and `score` methods are never called.
+`Scorer.run()` accepts the same `envelope: xr.DataArray` and delegates directly to `aggregate_modifiers`. Plugins whose `validate_config` returns `False` are skipped entirely.
 
 ---
 
