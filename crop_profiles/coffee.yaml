@@ -21,3 +21,22 @@ climate_envelope:
       optimal_min: 1000.0
       optimal_max: 2000.0
       viable_max: 3000.0
+
+calibration_anchors:
+  - id: yirgacheffe_sidama
+    name: Yirgacheffe / Sidama
+    role: origin_center
+    bbox: [37.0, 5.0, 40.0, 9.0]
+    notes: "Core arabica origin. Declining score here is the most important signal the platform can produce."
+
+  - id: colombia_huila
+    name: Colombia Huila
+    role: production_reference
+    bbox: [-76.5, 1.5, -74.5, 3.0]
+    notes: "Premium Colombian arabica production zone. Active export at scale."
+
+  - id: central_america_pacific_stress
+    name: Central America Pacific Coast
+    role: stress_reference
+    bbox: [-90.0, 13.0, -87.0, 15.0]
+    notes: "Documented climate stress zone. High scores here indicate the model is missing real-world decline."

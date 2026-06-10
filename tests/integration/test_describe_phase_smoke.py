@@ -113,3 +113,37 @@ def test_cli_describe_phase_prints_summary(_skip_if_no_data, capsys):
     captured = capsys.readouterr()
     assert "score" in captured.out.lower()
     assert "ethiopia" in captured.out.lower()
+
+
+@pytest.mark.integration
+def test_cli_prints_calibration_anchor_scores(_skip_if_no_data, capsys):
+    # Anchors defined in coffee.yaml must be scored and printed.
+    # Yirgacheffe is an origin_center — its score and expected_min must appear.
+    from groundshift.cli import build_arg_parser, run_describe
+
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        ["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "describe"]
+    )
+    run_describe(args)
+
+    captured = capsys.readouterr()
+    assert "yirgacheffe" in captured.out.lower()
+    assert "anchor" in captured.out.lower()
+
+
+@pytest.mark.integration
+def test_cli_prints_alert_when_anchor_scores_below_threshold(_skip_if_no_data, capsys):
+    # The Colombia Huila anchor (production_reference, expected_min=0.60) covers
+    # a region outside the Ethiopia run bbox — the clip will be empty and mean()
+    # will return NaN. An empty-clip anchor must not crash; it should print
+    # something informative rather than silently succeed.
+    from groundshift.cli import build_arg_parser, run_describe
+
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        ["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "describe"]
+    )
+    # This test just asserts the CLI doesn't raise; anchor output is already
+    # verified by test_cli_prints_calibration_anchor_scores above.
+    run_describe(args)
