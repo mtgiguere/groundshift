@@ -60,7 +60,10 @@ def make_plugin():
                     factor_value=_scalar_da(factor),
                     probability=_scalar_da(probability),
                     confidence=_scalar_da(confidence),
-                    metadata={},
+                    metadata={
+                        "threat_tier": meta.threat_tier,
+                        "custom_weight": meta.custom_weight,
+                    },
                 )
 
             def describe(self, score: SuitabilityModifier) -> str:
