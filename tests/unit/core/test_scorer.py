@@ -93,3 +93,13 @@ def test_scorer_with_two_plugins_aggregates_confidence(make_plugin):
     registry.register(make_plugin("p2", factor=1.0, confidence=0.8))
     result = Scorer(registry).run(_da(0.5), REGION, TIME_RANGE, CROP_PROFILE)
     assert float(result.confidence.mean()) == pytest.approx(0.6)
+
+
+def test_existential_tier_plugin_applies_liebig_ceiling_not_multiplicative(make_plugin):
+    # existential factor=0.3, envelope=0.8:
+    #   correct (existential): min(0.8, 0.3) = 0.3
+    #   wrong   (stress bug):  0.8 × 0.3    = 0.24
+    registry = PluginRegistry()
+    registry.register(make_plugin("p1", factor=0.3, probability=1.0, threat_tier="existential"))
+    result = Scorer(registry).run(_da(0.8), REGION, TIME_RANGE, CROP_PROFILE)
+    assert float(result.score.mean()) == pytest.approx(0.3)
