@@ -88,7 +88,10 @@ groundshift/
 ├── groundshift/                  # Core Python package
 │   ├── core/
 │   │   ├── envelope/
-│   │   │   ├── envelope_scorer.py       # Generic crop envelope scoring
+│   │   │   ├── threshold.py             # ✓ implemented — ClimateThreshold trapezoid scoring
+│   │   │   ├── scorer.py                # ✓ implemented — EnvelopeScorer (Liebig's min across variables)
+│   │   │   ├── profile_loader.py        # ✓ implemented — envelope_scorer_from_profile(dict)
+│   │   │   ├── yaml_loader.py           # ✓ implemented — load_profile_from_yaml(Path) I/O wrapper
 │   │   │   ├── cmip6_projector.py       # CMIP6 scenario projection
 │   │   │   └── soil_matcher.py          # SoilGrids integration
 │   │   ├── imagery/
@@ -146,7 +149,7 @@ groundshift/
 │   └── cli.py                           # groundshift run entrypoint
 │
 ├── crop_profiles/
-│   ├── coffee.yaml
+│   ├── coffee_arabica.yaml              # ✓ Arabica thresholds (temp, precipitation, altitude)
 │   ├── wine_grape.yaml
 │   ├── olive.yaml
 │   ├── wheat.yaml
@@ -156,7 +159,10 @@ groundshift/
 ├── tests/
 │   ├── unit/
 │   │   ├── conftest.py                  # ✓ shared make_plugin fixture factory
-│   │   ├── core/                        # ✓ test_aggregator.py, test_scorer.py
+│   │   ├── core/
+│   │   │   ├── envelope/                # ✓ test_threshold.py, test_envelope_scorer.py, test_profile_loader.py
+│   │   │   ├── test_aggregator.py       # ✓
+│   │   │   └── test_scorer.py           # ✓
 │   │   ├── models/                      # ✓ test_bounding_box, time_range, suitability_modifier, layer_data, plugin_metadata
 │   │   └── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   ├── integration/                     # requires live PostGIS — not yet written

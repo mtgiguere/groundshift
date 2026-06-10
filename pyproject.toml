@@ -7,9 +7,9 @@ name = "groundshift"
 version = "0.1.0"
 description = "Open geospatial intelligence platform for crop climate suitability"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["pyyaml>=6.0"]
 
 [project.optional-dependencies]
 dev = [
@@ -22,6 +22,9 @@ dev = [
 
 [project.scripts]
 groundshift = "groundshift.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["groundshift*"]
 
 [tool.ruff]
 target-version = "py312"
