@@ -459,6 +459,114 @@ Offline packages are generated as a post-step after each pipeline run and stored
 
 ---
 
+## Suitability Model
+
+This section documents the core scientific and architectural principles behind how Groundshift computes suitability. These were established through deliberate design — understanding them is essential before working on any pipeline component.
+
+### The Envelope is the Gate
+
+The climate envelope is not a plugin. It is the foundation of the suitability model.
+
+The envelope answers one question: **can this crop physically exist here?** A cell where temperature, precipitation, or altitude falls outside the crop's viable range scores zero. No downstream factor can change that. The envelope defines the ceiling — plugins operate inside it.
+
+This is not a software convenience; it is scientifically necessary. An additive modifier model would allow a cluster of positive signals (good infrastructure, low pest pressure) to push a climatically impossible zone into apparent viability. That is indefensible. The envelope is a hard gate.
+
+```
+final_score = 0.0  if  envelope_score = 0.0  (always, regardless of plugins)
+final_score ≤ envelope_score  (always)
+```
+
+### Spatial Primitives
+
+All suitability data flows as `xarray.DataArray` grids — one value per geographic cell. This applies to:
+
+- `LayerData.data` — the raw evidence a plugin fetches
+- `SuitabilityModifier` fields — factor, probability, confidence surfaces
+- `SuitabilityResult` fields — the final score and confidence surfaces
+
+A scalar is a degenerate DataArray. The aggregator math is identical; xarray applies it element-wise across the grid.
+
+### Plugin Threat Tiers
+
+Plugins declare a `threat_tier` in their metadata. The tier determines how the aggregator combines their output — because different threats have categorically different effects on crop viability.
+
+**Tier 1 — Existential**
+
+Threats that can eliminate viability in a zone regardless of other conditions: disease outbreaks (Coffee Leaf Rust, Panama Disease, Wheat Blast), catastrophic flooding. These combine with the envelope via Liebig's Law — the most limiting factor defines the ceiling.
+
+```
+ceiling = min(envelope, existential_1, existential_2, ...)
+```
+
+**Tier 2 — Stress**
+
+Independent stressors that reduce achievable suitability but do not individually eliminate it: minor pest pressure, frost risk, water stress. These compound multiplicatively — three moderate stresses accumulate into a meaningful reduction.
+
+```
+stress_factor = effective_1 × effective_2 × effective_3 × ...
+```
+
+**Tier 3 — Custom**
+
+For threat types not captured by the first two tiers. Plugin author declares a `custom_weight` that controls how hard their factor hits. The weight acts as an exponent:
+
+```
+custom_factor = factor_A^weight_A × factor_B^weight_B × ...
+```
+
+Suggested weights (document in PLUGIN.md):
+
+| Weight | Meaning |
+|---|---|
+| `0.25` | Background signal — barely moves the score |
+| `0.5` | Minor factor — noticeable, doesn't dominate |
+| `1.0` | Standard — equivalent to a stress-tier plugin (default) |
+| `2.0` | Significant — outsized influence, use carefully |
+
+### Probability and Confidence
+
+Each plugin factor carries three independent dimensions:
+
+| Field | Meaning |
+|---|---|
+| `factor_value` | Severity if the stressor occurs — `0.0` = catastrophic, `1.0` = no effect |
+| `probability` | Likelihood the stressor occurs — `[0.0, 1.0]` |
+| `confidence` | Certainty of the estimates themselves — `[0.0, 1.0]` |
+
+`probability` and `confidence` are not the same thing. A plugin can be highly confident (`confidence=0.9`) that Coffee Leaf Rust would devastate this zone if it arrived, while the arrival probability this season is low (`probability=0.15`). Conflating them would misrepresent both the science and the uncertainty.
+
+The aggregator converts each plugin's raw factor to an **effective factor** before tier aggregation:
+
+```
+effective_factor = 1.0 - (probability × (1.0 - factor_value))
+```
+
+| factor_value | probability | effective_factor | meaning |
+|---|---|---|---|
+| 0.0 | 1.0 | 0.0 | certain catastrophe |
+| 0.0 | 0.1 | 0.9 | catastrophic but unlikely |
+| 0.8 | 1.0 | 0.8 | certain mild stress |
+| 0.8 | 0.5 | 0.9 | 50% chance of mild stress |
+
+### Full Aggregation Formula
+
+```
+# Step 1: effective factor per plugin
+eff_i = 1.0 - (probability_i × (1.0 - factor_i))
+
+# Step 2: tier aggregation
+ceiling       = min(envelope, eff_existential_1, eff_existential_2, ...)
+stress_factor = eff_stress_1 × eff_stress_2 × ...
+custom_factor = eff_custom_A^weight_A × eff_custom_B^weight_B × ...
+
+# Step 3: final surface
+final_score = ceiling × stress_factor × custom_factor
+```
+
+All operations are element-wise on DataArrays. The final output is a spatially complete suitability surface.
+
+---
+
 ## Plugin Architecture
 
 See [PLUGIN.md](PLUGIN.md) for the full plugin development guide.
@@ -467,6 +575,7 @@ See [PLUGIN.md](PLUGIN.md) for the full plugin development guide.
 
 ```python
 from abc import ABC, abstractmethod
+import xarray as xr
 from groundshift.models import (
     BoundingBox, TimeRange, LayerData, SuitabilityModifier, PluginMetadata
 )
@@ -476,34 +585,28 @@ class GroundshiftPlugin(ABC):
     @property
     @abstractmethod
     def metadata(self) -> PluginMetadata:
-        """Name, version, crop compatibility, data requirements."""
+        """Identity, threat tier, crop compatibility, data requirements."""
 
     @abstractmethod
     def validate_config(self, crop_profile: dict) -> bool:
         """Return True if this plugin can run for this crop profile."""
 
     @abstractmethod
-    def fetch_data(
-        self,
-        region: BoundingBox,
-        time_range: TimeRange
-    ) -> LayerData:
-        """Fetch and return the plugin's evidence data."""
+    def fetch_data(self, region: BoundingBox, time_range: TimeRange) -> LayerData:
+        """Fetch and return the plugin's evidence data as a DataArray."""
 
     @abstractmethod
-    def score(
-        self,
-        layer_data: LayerData,
-        crop_profile: dict
-    ) -> SuitabilityModifier:
+    def score(self, layer_data: LayerData, crop_profile: dict) -> SuitabilityModifier:
         """
-        Return a SuitabilityModifier.
+        Return a SuitabilityModifier with spatial DataArray fields.
 
-        modifier_value: float in [-1.0, 1.0]
-            Positive = opportunity signal (amplifies suitability)
-            Negative = stress signal (suppresses suitability)
-        confidence: float in [0.0, 1.0]
-            How much weight the aggregator should give this modifier.
+        factor_value: DataArray, values in [0.0, 1.0]
+            0.0 = stressor eliminates viability entirely
+            1.0 = stressor has no effect
+        probability: DataArray, values in [0.0, 1.0]
+            Likelihood the stressor occurs at each cell.
+        confidence: DataArray, values in [0.0, 1.0]
+            Certainty of the factor and probability estimates.
         """
 
     @abstractmethod
@@ -511,25 +614,42 @@ class GroundshiftPlugin(ABC):
         """Human-readable explanation of this modifier for reporting."""
 ```
 
+Plugins that work with vector data (GeoDataFrames, polygon features) should use the adapter utility before returning:
+
+```python
+from groundshift.core.utils.raster import geodataframe_to_modifier
+```
+
+### SuitabilityModifier Contract
+
+```python
+@dataclass
+class SuitabilityModifier:
+    plugin_id:    str
+    region:       BoundingBox
+    factor_value: xr.DataArray   # [0.0, 1.0] — severity if stressor occurs
+    probability:  xr.DataArray   # [0.0, 1.0] — likelihood stressor occurs
+    confidence:   xr.DataArray   # [0.0, 1.0] — certainty of estimates
+    metadata:     dict
+```
+
 ### Modifier Aggregation
 
-The core aggregator combines plugin modifiers using a confidence-weighted approach. No single plugin can move the final score by more than a configurable cap (default: 25% of the base score). This prevents a single poorly-calibrated plugin from dominating outputs.
+The aggregator applies the three-tier formula (see Suitability Model section). It accepts the envelope surface and a list of plugin modifiers, and returns a `SuitabilityResult` containing the final score surface and an aggregate confidence surface.
 
 ```python
 def aggregate_modifiers(
-    base_score: float,
+    envelope: xr.DataArray,
     modifiers: list[SuitabilityModifier],
-    max_single_plugin_impact: float = 0.25,
 ) -> SuitabilityResult:
     """
-    Returns SuitabilityResult(score, confidence).
-    Each modifier is weighted by its confidence value.
-    Individual modifier impact is capped at max_single_plugin_impact * base_score.
-    Output score is clamped to [0.0, 1.0].
+    Returns SuitabilityResult(score, confidence) as DataArrays.
+    Envelope is the hard ceiling — zero envelope cells are always zero output.
+    Plugins are routed by threat_tier declared in their metadata.
     """
 ```
 
-`Scorer.run()` delegates directly to `aggregate_modifiers`, returning the same `SuitabilityResult`. Plugins whose `validate_config` returns `False` for the given crop profile are skipped entirely — their `fetch_data` and `score` methods are never called.
+`Scorer.run()` delegates directly to `aggregate_modifiers`. Plugins whose `validate_config` returns `False` are skipped — their `fetch_data` and `score` methods are never called.
 
 ---
 
