@@ -68,7 +68,7 @@ def download_worldclim(dest_dir: Path = DATA_DIR, resolution: str = "10m") -> No
         return
 
     dest_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Downloading WorldClim v2.1 ({resolution}) → {dest_dir}")
+    print(f"Downloading WorldClim v2.1 ({resolution}) -> {dest_dir}")
 
     # Bio variables: the full zip contains all 19 bioclimatic variables;
     # we extract only bio_1 and bio_12.
