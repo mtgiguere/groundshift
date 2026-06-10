@@ -96,3 +96,20 @@ def test_ethiopia_highland_region_has_viable_coffee_cells(ethiopia_result):
     # must score at least some cells as viable (score > 0). If this fails,
     # the thresholds or variable mapping are wrong.
     assert float(ethiopia_result.score.max()) > 0.0
+
+
+@pytest.mark.integration
+def test_cli_describe_phase_prints_summary(_skip_if_no_data, capsys):
+    # The CLI is the user-facing entry point — verify it runs end-to-end
+    # and prints a human-readable summary without raising.
+    from groundshift.cli import build_arg_parser, run_describe
+
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        ["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "describe"]
+    )
+    run_describe(args)
+
+    captured = capsys.readouterr()
+    assert "score" in captured.out.lower()
+    assert "ethiopia" in captured.out.lower()
