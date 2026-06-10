@@ -5,6 +5,7 @@ Synthetic NetCDF files are written with ERA5's native coordinate names
 (latitude/longitude, descending latitude) so the tests exercise the
 real normalization path ERA5Source must perform.
 """
+
 from datetime import datetime
 from pathlib import Path
 
@@ -19,8 +20,8 @@ REGION = BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=42.0, max_lat=15.0)
 TIME_RANGE = TimeRange(start=datetime(2015, 1, 1), end=datetime(2024, 12, 31))
 
 # Synthetic grid covering a superset of REGION; latitude descending as in ERA5.
-_LONS = np.linspace(25.0, 55.0, 61)   # 0.5° resolution
-_LATS = np.linspace(20.0, -5.0, 51)   # descending, like ERA5
+_LONS = np.linspace(25.0, 55.0, 61)  # 0.5° resolution
+_LATS = np.linspace(20.0, -5.0, 51)  # descending, like ERA5
 
 
 def _write_nc(path: Path, fill_value: float) -> None:

@@ -15,6 +15,7 @@ Requires a CDS API key:
 Install the optional ingest dependencies first:
     pip install groundshift[ingest]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,6 +31,7 @@ _G = 9.80665  # m/s² — standard gravity for geopotential conversion
 # ---------------------------------------------------------------------------
 # Pure helpers — unit-tested
 # ---------------------------------------------------------------------------
+
 
 def _temp_cds_request(year_start: int, year_end: int) -> dict:
     return {
@@ -83,6 +85,7 @@ def _geopotential_to_altitude(da: xr.DataArray) -> xr.DataArray:
 # I/O boundary — not unit-tested
 # ---------------------------------------------------------------------------
 
+
 def download_era5(
     dest_dir: Path = DATA_DIR,
     year_start: int = 2015,
@@ -97,8 +100,7 @@ def download_era5(
         import cdsapi
     except ImportError as exc:
         raise ImportError(
-            "cdsapi is required for ERA5 download. "
-            "Install it with: pip install groundshift[ingest]"
+            "cdsapi is required for ERA5 download. Install it with: pip install groundshift[ingest]"
         ) from exc
 
     dest_dir.mkdir(parents=True, exist_ok=True)

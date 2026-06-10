@@ -4,6 +4,7 @@ Unit tests for the ERA5 ingest script pure functions.
 The download itself (I/O boundary) is not tested here — it requires CDS API
 credentials. Only the pure helper functions are covered.
 """
+
 from pathlib import Path
 
 import numpy as np
