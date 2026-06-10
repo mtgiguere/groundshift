@@ -94,8 +94,11 @@ groundshift/
 │   │   │   ├── yaml_loader.py           # ✓ load_profile_from_yaml(Path) → dict — I/O boundary
 │   │   │   ├── climate_source.py        # ✓ ClimateDataSource ABC — fetch(variable, region, time_range)
 │   │   │   ├── climate_envelope.py      # ✓ compute_envelope(profile, source, region, time_range) → DataArray
+│   │   │   ├── worldclim_source.py      # ✓ WorldClimSource — file-backed ClimateDataSource, 1970-2000 baseline
 │   │   │   ├── cmip6_projector.py       # CMIP6 scenario projection — planned
 │   │   │   └── soil_matcher.py          # SoilGrids integration — planned
+│   │   ├── phases/
+│   │   │   └── describe.py              # ✓ DescribePhaseRunner — end-to-end Describe orchestration
 │   │   ├── imagery/
 │   │   │   ├── sentinel2_pipeline.py    # Sentinel-2 ingestion + compositing — planned
 │   │   │   ├── landsat_archive.py       # Landsat historical access — planned
@@ -107,7 +110,9 @@ groundshift/
 │   │   │   ├── loss_zone_detector.py    # Phase 3 — planned
 │   │   │   └── transition_recommender.py # Phase 3 — planned
 │   │   ├── aggregator.py                # ✓ three-tier aggregation (existential/stress/custom), envelope gate
-│   │   └── scorer.py                    # ✓ runs registry plugins against envelope, returns SuitabilityResult
+│   │   ├── scorer.py                    # ✓ runs registry plugins against envelope, returns SuitabilityResult
+│   │   └── utils/
+│   │       └── raster.py                # ✓ geodataframe_to_modifier — rasterize GeoDataFrame to SuitabilityModifier
 │   │
 │   ├── api/
 │   │   ├── app.py                       # FastAPI application entry point
@@ -159,11 +164,14 @@ groundshift/
 │   ├── unit/
 │   │   ├── conftest.py                  # ✓ make_plugin fixture (DataArray fields, threat_tier)
 │   │   ├── core/
-│   │   │   ├── envelope/                # ✓ test_threshold, test_envelope_scorer, test_profile_loader, test_climate_envelope
+│   │   │   ├── envelope/                # ✓ test_threshold, test_envelope_scorer, test_profile_loader, test_climate_envelope, test_worldclim_source
+│   │   │   ├── phases/                  # ✓ test_describe_phase_runner
+│   │   │   ├── utils/                   # ✓ test_raster
 │   │   │   ├── test_aggregator.py       # ✓ three-tier logic, probability/expected value, property tests
 │   │   │   └── test_scorer.py           # ✓
 │   │   ├── models/                      # ✓ all models covered
-│   │   └── plugins/                     # ✓ test_plugin_base.py, test_registry.py
+│   │   ├── plugins/                     # ✓ test_plugin_base.py, test_registry.py
+│   │   └── scripts/                     # ✓ test_download_worldclim
 │   ├── integration/                     # requires live PostGIS — not yet written
 │   └── fixtures/                        # synthetic datasets — not yet written
 │
@@ -174,7 +182,10 @@ groundshift/
 │   └── data_sources.md
 │
 ├── scripts/
+│   ├── __init__.py
 │   └── ingest/                          # One-time and scheduled ingestion
+│       ├── __init__.py
+│       └── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
 │
 ├── infrastructure/
 │   └── aws/                             # Lambda, S3, RDS terraform/CDK
@@ -595,13 +606,13 @@ class ClimateDataSource(ABC):
         """Return a DataArray of values for the named variable over the region."""
 ```
 
-Planned implementations:
+Implementations:
 
-| Implementation | Data | Phase |
-|---|---|---|
-| `WorldClimSource` | Historical baseline climatology (1970–2000) | Describe |
-| `ERA5Source` | Recent observed climate (2015–present) | Describe |
-| `CMIP6Source` | Projected climate under SSP2/SSP5 scenarios | Predict |
+| Implementation | Data | Phase | Status |
+|---|---|---|---|
+| `WorldClimSource` | Historical baseline climatology (1970–2000) | Describe | ✓ Complete |
+| `ERA5Source` | Recent observed climate (2015–present) | Describe | Planned |
+| `CMIP6Source` | Projected climate under SSP2/SSP5 scenarios | Predict | Planned |
 
 Each implementation clips to the requested `BoundingBox`, reprojects to EPSG:4326, and returns a consistently named DataArray. The pipeline is indifferent to which source is used — swap `WorldClimSource` for `CMIP6Source` and the same `compute_envelope` call produces a projected suitability surface instead of a current one.
 
@@ -788,11 +799,11 @@ GROUNDSHIFT_API_PORT=8000
 
 ## Roadmap
 
-| Phase | Scope |
-|---|---|
-| Phase 1 — Describe | Climate envelope + imagery pipelines, coffee/Ethiopia, full test coverage |
-| Phase 2 — Predict | CMIP6 projection pipeline, SSP2/SSP5 scenarios, scenario comparison |
-| Phase 3 — Prescribe | Opportunity zone detection, transition recommender, cooperative infrastructure layer |
-| API + delivery | REST API, web app, mobile app, offline package generation |
-| Plugin expansion | Frost risk, pest/disease, phenology plugins |
-| Additional crops | Wine grape, olive, wheat profiles production-ready |
+| Phase | Scope | Status |
+|---|---|---|
+| Phase 1 — Describe | Climate envelope pipeline complete (WorldClimSource, DescribePhaseRunner). Imagery pipeline (Sentinel-2 NDVI, Landsat trend detection) next. | In Progress |
+| Phase 2 — Predict | CMIP6 projection pipeline, SSP2/SSP5 scenarios, scenario comparison | Planned |
+| Phase 3 — Prescribe | Opportunity zone detection, transition recommender, cooperative infrastructure layer | Planned |
+| API + delivery | REST API, web app, mobile app, offline package generation | Planned |
+| Plugin expansion | Frost risk, pest/disease, phenology plugins | Planned |
+| Additional crops | Wine grape, olive, wheat profiles production-ready | Planned |

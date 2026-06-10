@@ -198,7 +198,7 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. Core pipeline infrastructure is complete. The Describe phase is in progress — climate envelope scoring is fully built and spatially capable; the phase runner that orchestrates a full end-to-end run is next.
+Active development. The Describe phase climate envelope pipeline is complete — envelope scoring, WorldClim data source, and end-to-end phase runner are all built and tested. The imagery analysis layer (Sentinel-2 NDVI, Landsat trend detection) is next for the Describe phase.
 
 | Component | Status |
 |---|---|
@@ -213,8 +213,10 @@ Active development. Core pipeline infrastructure is complete. The Describe phase
 | Crop profile YAML loader | ✓ Complete |
 | ClimateDataSource ABC | ✓ Complete |
 | compute_envelope (envelope pipeline step) | ✓ Complete |
-| DescribePhaseRunner (end-to-end Describe orchestration) | In progress |
-| WorldClim / ERA5 ClimateDataSource implementation | Planned |
+| WorldClimSource (1970–2000 baseline ClimateDataSource) | ✓ Complete |
+| Raster utility (geodataframe_to_modifier — GeoDataFrame → SuitabilityModifier) | ✓ Complete |
+| DescribePhaseRunner (end-to-end Describe orchestration) | ✓ Complete |
+| ERA5Source (recent observed climate ClimateDataSource) | Planned |
 | Sentinel-2 / Landsat imagery pipeline | Planned |
 | CMIP6 projection pipeline | Planned |
 | Opportunity zone detector (Phase 3) | Planned |
