@@ -36,3 +36,47 @@ def test_run_invalid_phase_exits_with_error():
     parser = build_arg_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "invalid"])
+
+
+def test_source_defaults_to_worldclim():
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        ["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "describe"]
+    )
+    assert args.source == "worldclim"
+
+
+def test_source_era5_is_accepted():
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "run",
+            "--crop",
+            "coffee",
+            "--region",
+            "ethiopia",
+            "--phase",
+            "describe",
+            "--source",
+            "era5",
+        ]
+    )
+    assert args.source == "era5"
+
+
+def test_source_invalid_exits_with_error():
+    parser = build_arg_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "run",
+                "--crop",
+                "coffee",
+                "--region",
+                "ethiopia",
+                "--phase",
+                "describe",
+                "--source",
+                "foobar",
+            ]
+        )
