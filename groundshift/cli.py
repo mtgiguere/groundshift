@@ -1,9 +1,12 @@
 import argparse
+import math
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
 
+from groundshift.core.calibration.anchor_loader import load_anchors_from_profile
+from groundshift.core.calibration.anchor_scorer import score_anchors
 from groundshift.core.envelope.worldclim_source import WorldClimSource
 from groundshift.core.envelope.yaml_loader import load_profile_from_yaml
 from groundshift.core.phases.describe import DescribePhaseRunner
@@ -66,6 +69,20 @@ def run_describe(args: argparse.Namespace) -> None:
     print(f"  region:  {args.region}")
     print(f"  cells:   {len(finite)} scored, {len(viable)} viable (score > 0)")
     print(f"  score:   min={finite.min():.3f}  mean={finite.mean():.3f}  max={finite.max():.3f}")
+
+    anchors = load_anchors_from_profile(profile)
+    if anchors:
+        anchor_scores = score_anchors(result, anchors)
+        print()
+        print("  calibration anchors:")
+        for a in anchor_scores:
+            score_str = f"{a.score:.3f}" if not math.isnan(a.score) else "n/a (outside region)"
+            alert_str = "  *** ALERT ***" if a.alert_triggered else ""
+            if a.expected_min is not None:
+                threshold_str = f"  (expected >= {a.expected_min:.2f})"
+            else:
+                threshold_str = "  (stress reference — no floor)"
+            print(f"    [{a.anchor.role}] {a.anchor.name}: {score_str}{threshold_str}{alert_str}")
 
 
 def main() -> None:
