@@ -40,6 +40,7 @@ markers = [
 ]
 testpaths = ["tests"]
 addopts = "-v"
+pythonpath = ["."]
 
 [tool.coverage.run]
 source = ["groundshift"]
