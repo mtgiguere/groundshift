@@ -9,6 +9,7 @@ cannot see (nodata handling, coordinate propagation, real value ranges).
 Requires WorldClim data on disk. If missing, run:
     python scripts/ingest/download_worldclim.py
 """
+
 from datetime import datetime
 from pathlib import Path
 
