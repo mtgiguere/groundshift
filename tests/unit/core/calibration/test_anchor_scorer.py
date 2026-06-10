@@ -4,6 +4,7 @@ Tests for score_anchors.
 Synthetic DataArrays use x (lon, ascending) and y (lat, descending) to
 match the convention rioxarray produces when opening GeoTIFFs.
 """
+
 import numpy as np
 import pytest
 import xarray as xr

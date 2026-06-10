@@ -15,6 +15,4 @@ class CalibrationAnchor:
 
     def __post_init__(self) -> None:
         if self.role not in _VALID_ROLES:
-            raise ValueError(
-                f"role must be one of {sorted(_VALID_ROLES)}, got '{self.role}'"
-            )
+            raise ValueError(f"role must be one of {sorted(_VALID_ROLES)}, got '{self.role}'")
