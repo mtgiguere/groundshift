@@ -207,7 +207,8 @@ Active development. Core data models, plugin infrastructure (ABC, registry, scor
 | Plugin base class (GroundshiftPlugin ABC) | ✓ Complete |
 | Plugin registry | ✓ Complete |
 | Scorer (plugin orchestration + aggregation) | ✓ Complete |
-| Climate envelope scorer | Planned |
+| Climate envelope scorer (ClimateThreshold, EnvelopeScorer) | ✓ Complete |
+| Crop profile YAML loader | ✓ Complete |
 | Sentinel-2 / Landsat imagery pipeline | Planned |
 | CMIP6 projection pipeline | Planned |
 | Opportunity zone detector (Phase 3) | Planned |
