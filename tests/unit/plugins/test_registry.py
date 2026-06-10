@@ -34,3 +34,11 @@ def test_get_unknown_id_raises():
     registry = PluginRegistry()
     with pytest.raises(KeyError):
         registry.get("nonexistent")
+
+
+def test_list_plugins_returns_snapshot_not_live_view(make_plugin):
+    registry = PluginRegistry()
+    registry.register(make_plugin("first"))
+    snapshot = registry.list_plugins()
+    registry.register(make_plugin("second"))
+    assert len(snapshot) == 1

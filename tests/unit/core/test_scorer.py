@@ -51,6 +51,57 @@ def test_scorer_run_returns_suitability_result():
     assert result.confidence == 1.0
 
 
+def test_scorer_with_two_plugins_reflects_both_confidences(make_plugin):
+    # Two plugins with different confidence levels — aggregate_confidence
+    # must equal their average, proving both were called.
+    registry = PluginRegistry()
+    registry.register(make_plugin("p1", modifier=0.2, confidence=0.4))
+    registry.register(make_plugin("p2", modifier=0.2, confidence=0.8))
+    _, confidence = Scorer(registry).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
+    assert abs(confidence - 0.6) < 1e-9
+
+
+def test_scorer_with_mixed_plugins_only_accepting_ones_contribute(make_plugin):
+    class _RejectingPlugin(GroundshiftPlugin):
+        @property
+        def metadata(self) -> PluginMetadata:
+            return PluginMetadata(
+                plugin_id="rejector",
+                name="Rejector",
+                version="0.1.0",
+                description="",
+                author="Test",
+                compatible_crops=[],
+                data_sources=[],
+                requires_network=False,
+                phase_applicability=["describe"],
+            )
+
+        def validate_config(self, crop_profile: dict) -> bool:
+            return False
+
+        def fetch_data(self, region: BoundingBox, time_range: TimeRange) -> LayerData:
+            raise AssertionError("must not be called")
+
+        def score(self, layer_data: LayerData, crop_profile: dict) -> SuitabilityModifier:
+            raise AssertionError("must not be called")
+
+        def describe(self, score: SuitabilityModifier) -> str:
+            return ""
+
+    registry = PluginRegistry()
+    registry.register(make_plugin("accepting", modifier=0.3, confidence=1.0))
+    registry.register(_RejectingPlugin())
+
+    one = PluginRegistry()
+    one.register(make_plugin("accepting", modifier=0.3, confidence=1.0))
+
+    mixed_score, _ = Scorer(registry).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
+    one_score, _ = Scorer(one).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
+
+    assert mixed_score == one_score
+
+
 def test_scorer_skips_plugin_that_rejects_crop_profile():
     class _RejectingPlugin(GroundshiftPlugin):
         @property

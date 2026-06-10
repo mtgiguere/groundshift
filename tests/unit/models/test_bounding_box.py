@@ -34,3 +34,31 @@ def test_bounding_box_raises_if_longitude_out_of_range():
 def test_bounding_box_raises_if_latitude_out_of_range():
     with pytest.raises(ValueError, match="latitude"):
         BoundingBox(min_lon=35.0, min_lat=-91.0, max_lon=42.0, max_lat=15.0)
+
+
+def test_bounding_box_raises_if_max_lon_out_of_range():
+    with pytest.raises(ValueError, match="longitude"):
+        BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=181.0, max_lat=15.0)
+
+
+def test_bounding_box_raises_if_max_lat_out_of_range():
+    with pytest.raises(ValueError, match="latitude"):
+        BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=42.0, max_lat=91.0)
+
+
+def test_bounding_box_raises_if_min_lon_equals_max_lon():
+    with pytest.raises(ValueError, match="min_lon"):
+        BoundingBox(min_lon=42.0, min_lat=3.0, max_lon=42.0, max_lat=15.0)
+
+
+def test_bounding_box_raises_if_min_lat_equals_max_lat():
+    with pytest.raises(ValueError, match="min_lat"):
+        BoundingBox(min_lon=35.0, min_lat=15.0, max_lon=42.0, max_lat=15.0)
+
+
+def test_bounding_box_accepts_full_extent_boundary_values():
+    bbox = BoundingBox(min_lon=-180.0, min_lat=-90.0, max_lon=180.0, max_lat=90.0)
+    assert bbox.min_lon == -180.0
+    assert bbox.max_lon == 180.0
+    assert bbox.min_lat == -90.0
+    assert bbox.max_lat == 90.0
