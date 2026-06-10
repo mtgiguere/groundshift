@@ -4,6 +4,7 @@ from hypothesis import strategies as st
 from groundshift.core.aggregator import aggregate_modifiers
 from groundshift.models.bounding_box import BoundingBox
 from groundshift.models.suitability_modifier import SuitabilityModifier
+from groundshift.models.suitability_result import SuitabilityResult
 
 REGION = BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=42.0, max_lat=15.0)
 
@@ -17,6 +18,13 @@ def _modifier(value: float, confidence: float) -> SuitabilityModifier:
         geometry=None,
         metadata={},
     )
+
+
+def test_aggregate_modifiers_returns_suitability_result():
+    result = aggregate_modifiers(base_score=0.5, modifiers=[])
+    assert isinstance(result, SuitabilityResult)
+    assert result.score == 0.5
+    assert result.confidence == 1.0
 
 
 def test_empty_modifiers_returns_base_score_unchanged():
