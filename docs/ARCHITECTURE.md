@@ -147,13 +147,14 @@ groundshift/
 │   │   └── spatial_store.py             # PostGIS interface
 │   │
 │   ├── regions/
-│   │   ├── registry.geojson             # Named region definitions
-│   │   └── resolver.py                  # resolve_region(id) → BoundingBox
+│   │   ├── __init__.py
+│   │   └── resolver.py                  # ✓ resolve_region(id) → BoundingBox; UnknownRegionError
 │   │
-│   └── cli.py                           # groundshift run entrypoint
+│   └── cli.py                           # ✓ build_arg_parser + run_describe; groundshift run entrypoint
 │
 ├── crop_profiles/
 │   ├── coffee_arabica.yaml              # ✓ Arabica thresholds (temp, precipitation, altitude)
+│   ├── coffee.yaml                      # ✓ Alias for arabica (default --crop coffee CLI argument)
 │   ├── wine_grape.yaml
 │   ├── olive.yaml
 │   ├── wheat.yaml
@@ -171,8 +172,11 @@ groundshift/
 │   │   │   └── test_scorer.py           # ✓
 │   │   ├── models/                      # ✓ all models covered
 │   │   ├── plugins/                     # ✓ test_plugin_base.py, test_registry.py
-│   │   └── scripts/                     # ✓ test_download_worldclim
-│   ├── integration/                     # requires live PostGIS — not yet written
+│   │   ├── regions/                     # ✓ test_resolver.py
+│   │   ├── scripts/                     # ✓ test_download_worldclim
+│   │   └── test_cli.py                  # ✓ argument parsing, required args, invalid phase
+│   ├── integration/
+│   │   └── test_describe_phase_smoke.py # ✓ full pipeline + CLI smoke test (requires WorldClim data)
 │   └── fixtures/                        # synthetic datasets — not yet written
 │
 ├── docs/
@@ -801,7 +805,7 @@ GROUNDSHIFT_API_PORT=8000
 
 | Phase | Scope | Status |
 |---|---|---|
-| Phase 1 — Describe | Climate envelope pipeline complete (WorldClimSource, DescribePhaseRunner). Imagery pipeline (Sentinel-2 NDVI, Landsat trend detection) next. | In Progress |
+| Phase 1 — Describe | Climate envelope pipeline complete (WorldClimSource, DescribePhaseRunner, CLI `run describe`). Imagery pipeline (Sentinel-2 NDVI, Landsat trend detection) next. | In Progress |
 | Phase 2 — Predict | CMIP6 projection pipeline, SSP2/SSP5 scenarios, scenario comparison | Planned |
 | Phase 3 — Prescribe | Opportunity zone detection, transition recommender, cooperative infrastructure layer | Planned |
 | API + delivery | REST API, web app, mobile app, offline package generation | Planned |
