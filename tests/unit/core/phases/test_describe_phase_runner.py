@@ -67,6 +67,7 @@ def test_describe_phase_runner_optimal_climate_no_plugins_scores_one():
     runner = _make_runner(source)
     result = runner.run(_PROFILE, REGION, TIME_RANGE)
     import pytest
+
     assert float(result.score.mean()) == pytest.approx(1.0)
 
 
@@ -75,15 +76,16 @@ def test_describe_phase_runner_impossible_climate_scores_zero():
     runner = _make_runner(source)
     result = runner.run(_PROFILE, REGION, TIME_RANGE)
     import pytest
+
     assert float(result.score.mean()) == pytest.approx(0.0)
 
 
 def test_describe_phase_runner_passes_envelope_as_gate_to_scorer():
     """Envelope zero must produce zero final score even if plugins would push higher."""
-    from groundshift.models.suitability_modifier import SuitabilityModifier
-    from groundshift.plugins.base import GroundshiftPlugin
     from groundshift.models.layer_data import LayerData
     from groundshift.models.plugin_metadata import PluginMetadata
+    from groundshift.models.suitability_modifier import SuitabilityModifier
+    from groundshift.plugins.base import GroundshiftPlugin
 
     class _OptimisticPlugin(GroundshiftPlugin):
         """Always returns a perfect-score modifier regardless of climate."""
@@ -136,4 +138,5 @@ def test_describe_phase_runner_passes_envelope_as_gate_to_scorer():
     result = runner.run(_PROFILE, REGION, TIME_RANGE)
 
     import pytest
+
     assert float(result.score.mean()) == pytest.approx(0.0)
