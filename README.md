@@ -198,13 +198,14 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. Core data models and plugin modifier aggregation are implemented and fully tested. Phase 1 (Describe) — climate envelope scoring and imagery pipeline — is next.
+Active development. Core data models, plugin modifier aggregation, the plugin ABC, and the plugin registry are implemented and fully tested. Phase 1 (Describe) — climate envelope scoring and imagery pipeline — is next.
 
 | Component | Status |
 |---|---|
 | Core models (BoundingBox, TimeRange, SuitabilityModifier, LayerData, PluginMetadata) | ✓ Complete |
 | Plugin modifier aggregator | ✓ Complete |
-| Plugin base class (GroundshiftPlugin ABC) | In progress |
+| Plugin base class (GroundshiftPlugin ABC) | ✓ Complete |
+| Plugin registry | ✓ Complete |
 | Climate envelope scorer | Planned |
 | Sentinel-2 / Landsat imagery pipeline | Planned |
 | CMIP6 projection pipeline | Planned |

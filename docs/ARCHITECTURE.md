@@ -113,8 +113,8 @@ groundshift/
 │   │       └── packages.py              # GET /packages/{crop}/{region}
 │   │
 │   ├── plugins/
-│   │   ├── base.py                      # GroundshiftPlugin ABC
-│   │   ├── registry.py                  # Plugin registration and discovery
+│   │   ├── base.py                      # ✓ implemented — GroundshiftPlugin ABC (5-method contract)
+│   │   ├── registry.py                  # ✓ implemented — register, get, list_plugins; duplicate guard
 │   │   ├── builtin/
 │   │   │   ├── climate_envelope/        # Always runs
 │   │   │   └── imagery/                 # Always runs
@@ -154,7 +154,8 @@ groundshift/
 ├── tests/
 │   ├── unit/
 │   │   ├── core/                        # ✓ test_aggregator.py
-│   │   └── models/                      # ✓ test_bounding_box, time_range, suitability_modifier, layer_data, plugin_metadata
+│   │   ├── models/                      # ✓ test_bounding_box, time_range, suitability_modifier, layer_data, plugin_metadata
+│   │   └── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   ├── integration/                     # requires live PostGIS — not yet written
 │   └── fixtures/                        # synthetic datasets — not yet written
 │
