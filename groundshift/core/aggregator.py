@@ -1,13 +1,14 @@
 from groundshift.models.suitability_modifier import SuitabilityModifier
+from groundshift.models.suitability_result import SuitabilityResult
 
 
 def aggregate_modifiers(
     base_score: float,
     modifiers: list[SuitabilityModifier],
     max_single_plugin_impact: float = 0.25,
-) -> tuple[float, float]:
+) -> SuitabilityResult:
     if not modifiers:
-        return base_score, 1.0
+        return SuitabilityResult(score=base_score, confidence=1.0)
 
     adjustment = 0.0
     total_weight = 0.0
@@ -27,4 +28,4 @@ def aggregate_modifiers(
     new_score = max(0.0, min(1.0, base_score + weighted_adjustment))
     aggregate_confidence = total_weight / len(modifiers)
 
-    return new_score, aggregate_confidence
+    return SuitabilityResult(score=new_score, confidence=aggregate_confidence)

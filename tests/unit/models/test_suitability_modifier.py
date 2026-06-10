@@ -66,3 +66,24 @@ def test_suitability_modifier_raises_if_confidence_below_0():
             geometry=None,
             metadata={},
         )
+
+
+@pytest.mark.parametrize(
+    "modifier_value,confidence",
+    [
+        (1.0, 1.0),
+        (-1.0, 0.0),
+        (0.0, 0.5),
+    ],
+)
+def test_suitability_modifier_accepts_exact_boundary_values(modifier_value, confidence):
+    modifier = SuitabilityModifier(
+        plugin_id="x",
+        region=REGION,
+        modifier_value=modifier_value,
+        confidence=confidence,
+        geometry=None,
+        metadata={},
+    )
+    assert modifier.modifier_value == modifier_value
+    assert modifier.confidence == confidence

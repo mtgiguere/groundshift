@@ -4,6 +4,7 @@ from hypothesis import strategies as st
 from groundshift.core.aggregator import aggregate_modifiers
 from groundshift.models.bounding_box import BoundingBox
 from groundshift.models.suitability_modifier import SuitabilityModifier
+from groundshift.models.suitability_result import SuitabilityResult
 
 REGION = BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=42.0, max_lat=15.0)
 
@@ -17,6 +18,13 @@ def _modifier(value: float, confidence: float) -> SuitabilityModifier:
         geometry=None,
         metadata={},
     )
+
+
+def test_aggregate_modifiers_returns_suitability_result():
+    result = aggregate_modifiers(base_score=0.5, modifiers=[])
+    assert isinstance(result, SuitabilityResult)
+    assert result.score == 0.5
+    assert result.confidence == 1.0
 
 
 def test_empty_modifiers_returns_base_score_unchanged():
@@ -83,6 +91,41 @@ def test_output_score_is_clamped_to_0_1_on_overflow():
         max_single_plugin_impact=0.25,
     )
     assert low_score >= 0.0
+
+
+def test_base_score_zero_uses_unit_magnitude_for_cap():
+    # When base_score=0 the cap would be 0 without the explicit 1.0 fallback,
+    # making every modifier useless. Verify a modifier still moves the score.
+    result = aggregate_modifiers(
+        base_score=0.0,
+        modifiers=[_modifier(value=0.5, confidence=1.0)],
+        max_single_plugin_impact=0.25,
+    )
+    assert result.score > 0.0
+
+
+def test_all_zero_confidence_modifiers_leave_score_unchanged():
+    result = aggregate_modifiers(
+        base_score=0.6,
+        modifiers=[
+            _modifier(value=0.5, confidence=0.0),
+            _modifier(value=-0.5, confidence=0.0),
+        ],
+    )
+    assert result.score == 0.6
+    assert result.confidence == 0.0
+
+
+def test_opposing_equal_modifiers_cancel():
+    result = aggregate_modifiers(
+        base_score=0.5,
+        modifiers=[
+            _modifier(value=0.4, confidence=1.0),
+            _modifier(value=-0.4, confidence=1.0),
+        ],
+        max_single_plugin_impact=0.25,
+    )
+    assert result.score == 0.5
 
 
 # ── Property tests ────────────────────────────────────────────────────────────

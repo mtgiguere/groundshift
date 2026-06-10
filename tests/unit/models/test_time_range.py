@@ -26,3 +26,9 @@ def test_time_range_defaults_horizon_year_to_none():
 def test_time_range_raises_if_end_before_start():
     with pytest.raises(ValueError, match="end"):
         TimeRange(start=datetime(2023, 1, 1), end=datetime(2020, 1, 1))
+
+
+def test_time_range_equal_start_and_end_is_valid():
+    t = datetime(2023, 6, 1)
+    tr = TimeRange(start=t, end=t)
+    assert tr.start == tr.end

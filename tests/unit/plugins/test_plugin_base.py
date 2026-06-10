@@ -25,40 +25,8 @@ _META = PluginMetadata(
 )
 
 
-class _ConcretePlugin(GroundshiftPlugin):
-    @property
-    def metadata(self) -> PluginMetadata:
-        return _META
-
-    def validate_config(self, crop_profile: dict) -> bool:
-        return True
-
-    def fetch_data(self, region: BoundingBox, time_range: TimeRange) -> LayerData:
-        return LayerData(
-            plugin_id=self.metadata.plugin_id,
-            region=region,
-            time_range=time_range,
-            data=None,
-            metadata={},
-        )
-
-    def score(self, layer_data: LayerData, crop_profile: dict) -> SuitabilityModifier:
-        return SuitabilityModifier(
-            plugin_id=self.metadata.plugin_id,
-            region=layer_data.region,
-            modifier_value=0.0,
-            confidence=1.0,
-            geometry=None,
-            metadata={},
-        )
-
-    def describe(self, score: SuitabilityModifier) -> str:
-        return "No effect detected."
-
-
-def test_complete_plugin_can_be_instantiated():
-    plugin = _ConcretePlugin()
-    assert plugin is not None
+def test_complete_plugin_can_be_instantiated(make_plugin):
+    assert make_plugin() is not None
 
 
 def test_plugin_cannot_be_instantiated_directly():
@@ -84,25 +52,21 @@ def test_plugin_missing_any_method_cannot_be_instantiated(missing):
         incomplete_plugin()
 
 
-def test_metadata_returns_plugin_metadata():
-    plugin = _ConcretePlugin()
-    assert isinstance(plugin.metadata, PluginMetadata)
+def test_metadata_returns_plugin_metadata(make_plugin):
+    assert isinstance(make_plugin().metadata, PluginMetadata)
 
 
-def test_validate_config_returns_bool():
-    plugin = _ConcretePlugin()
-    result = plugin.validate_config({})
-    assert isinstance(result, bool)
+def test_validate_config_returns_bool(make_plugin):
+    assert isinstance(make_plugin().validate_config({}), bool)
 
 
-def test_fetch_data_returns_layer_data():
-    plugin = _ConcretePlugin()
-    result = plugin.fetch_data(REGION, TIME_RANGE)
+def test_fetch_data_returns_layer_data(make_plugin):
+    result = make_plugin().fetch_data(REGION, TIME_RANGE)
     assert isinstance(result, LayerData)
 
 
-def test_score_returns_valid_suitability_modifier():
-    plugin = _ConcretePlugin()
+def test_score_returns_valid_suitability_modifier(make_plugin):
+    plugin = make_plugin()
     layer = plugin.fetch_data(REGION, TIME_RANGE)
     result = plugin.score(layer, {})
     assert isinstance(result, SuitabilityModifier)
@@ -110,8 +74,8 @@ def test_score_returns_valid_suitability_modifier():
     assert 0.0 <= result.confidence <= 1.0
 
 
-def test_describe_returns_nonempty_string():
-    plugin = _ConcretePlugin()
+def test_describe_returns_nonempty_string(make_plugin):
+    plugin = make_plugin()
     layer = plugin.fetch_data(REGION, TIME_RANGE)
     modifier = plugin.score(layer, {})
     result = plugin.describe(modifier)

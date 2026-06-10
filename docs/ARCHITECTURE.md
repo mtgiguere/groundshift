@@ -101,7 +101,8 @@ groundshift/
 │   │   │   ├── gain_zone_detector.py    # Phase 3 — stub; interface defined
 │   │   │   ├── loss_zone_detector.py    # Phase 3 — stub; interface defined
 │   │   │   └── transition_recommender.py # Phase 3 — stub; interface defined
-│   │   └── aggregator.py                # ✓ implemented — confidence-weighted modifier aggregation
+│   │   ├── aggregator.py                # ✓ implemented — confidence-weighted modifier aggregation
+│   │   └── scorer.py                    # ✓ implemented — runs registry plugins, returns SuitabilityResult
 │   │
 │   ├── api/
 │   │   ├── app.py                       # FastAPI application entry point
@@ -131,6 +132,7 @@ groundshift/
 │   │   ├── layer_data.py                # ✓ implemented — typed spatial data container
 │   │   ├── plugin_metadata.py           # ✓ implemented — plugin identity and requirements
 │   │   ├── suitability_modifier.py      # ✓ implemented — plugin output contract
+│   │   ├── suitability_result.py        # ✓ implemented — NamedTuple returned by aggregator and Scorer
 │   │   └── time_range.py               # ✓ implemented
 │   │
 │   ├── db/
@@ -153,7 +155,8 @@ groundshift/
 │
 ├── tests/
 │   ├── unit/
-│   │   ├── core/                        # ✓ test_aggregator.py
+│   │   ├── conftest.py                  # ✓ shared make_plugin fixture factory
+│   │   ├── core/                        # ✓ test_aggregator.py, test_scorer.py
 │   │   ├── models/                      # ✓ test_bounding_box, time_range, suitability_modifier, layer_data, plugin_metadata
 │   │   └── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   ├── integration/                     # requires live PostGIS — not yet written
@@ -510,14 +513,17 @@ The core aggregator combines plugin modifiers using a confidence-weighted approa
 def aggregate_modifiers(
     base_score: float,
     modifiers: list[SuitabilityModifier],
-    max_single_plugin_impact: float = 0.25
-) -> tuple[float, float]:
+    max_single_plugin_impact: float = 0.25,
+) -> SuitabilityResult:
     """
-    Returns (adjusted_score, aggregate_confidence).
+    Returns SuitabilityResult(score, confidence).
     Each modifier is weighted by its confidence value.
-    Individual modifier impact is capped at max_single_plugin_impact.
+    Individual modifier impact is capped at max_single_plugin_impact * base_score.
+    Output score is clamped to [0.0, 1.0].
     """
 ```
+
+`Scorer.run()` delegates directly to `aggregate_modifiers`, returning the same `SuitabilityResult`. Plugins whose `validate_config` returns `False` for the given crop profile are skipped entirely — their `fetch_data` and `score` methods are never called.
 
 ---
 

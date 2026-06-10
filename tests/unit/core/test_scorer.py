@@ -7,6 +7,7 @@ from groundshift.models.bounding_box import BoundingBox
 from groundshift.models.layer_data import LayerData
 from groundshift.models.plugin_metadata import PluginMetadata
 from groundshift.models.suitability_modifier import SuitabilityModifier
+from groundshift.models.suitability_result import SuitabilityResult
 from groundshift.models.time_range import TimeRange
 from groundshift.plugins.base import GroundshiftPlugin
 from groundshift.plugins.registry import PluginRegistry
@@ -14,52 +15,6 @@ from groundshift.plugins.registry import PluginRegistry
 REGION = BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=42.0, max_lat=15.0)
 TIME_RANGE = TimeRange(start=datetime(2022, 1, 1), end=datetime(2023, 1, 1))
 CROP_PROFILE: dict = {"crop_id": "coffee"}
-
-
-def _make_plugin(plugin_id: str, modifier: float, confidence: float) -> GroundshiftPlugin:
-    meta = PluginMetadata(
-        plugin_id=plugin_id,
-        name=plugin_id,
-        version="0.1.0",
-        description="",
-        author="Test",
-        compatible_crops=["*"],
-        data_sources=[],
-        requires_network=False,
-        phase_applicability=["describe"],
-    )
-
-    class _P(GroundshiftPlugin):
-        @property
-        def metadata(self) -> PluginMetadata:
-            return meta
-
-        def validate_config(self, crop_profile: dict) -> bool:
-            return True
-
-        def fetch_data(self, region: BoundingBox, time_range: TimeRange) -> LayerData:
-            return LayerData(
-                plugin_id=self.metadata.plugin_id,
-                region=region,
-                time_range=time_range,
-                data=None,
-                metadata={},
-            )
-
-        def score(self, layer_data: LayerData, crop_profile: dict) -> SuitabilityModifier:
-            return SuitabilityModifier(
-                plugin_id=self.metadata.plugin_id,
-                region=layer_data.region,
-                modifier_value=modifier,
-                confidence=confidence,
-                geometry=None,
-                metadata={},
-            )
-
-        def describe(self, score: SuitabilityModifier) -> str:
-            return f"modifier={modifier}"
-
-    return _P()
 
 
 def test_scorer_with_no_plugins_returns_base_score():
@@ -70,21 +25,81 @@ def test_scorer_with_no_plugins_returns_base_score():
     assert confidence == 1.0
 
 
-def test_scorer_applies_plugin_modifier_to_base_score():
+def test_scorer_applies_plugin_modifier_to_base_score(make_plugin):
     registry = PluginRegistry()
-    registry.register(_make_plugin("p1", modifier=0.2, confidence=1.0))
+    registry.register(make_plugin("p1", modifier=0.2, confidence=1.0))
     scorer = Scorer(registry)
     score, _ = scorer.run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
     assert score > 0.5
 
 
 @pytest.mark.parametrize("base,modifier", [(0.95, 1.0), (0.05, -1.0)])
-def test_scorer_output_score_is_clamped_to_0_1(base: float, modifier: float):
+def test_scorer_output_score_is_clamped_to_0_1(base: float, modifier: float, make_plugin):
     registry = PluginRegistry()
-    registry.register(_make_plugin("p1", modifier=modifier, confidence=1.0))
+    registry.register(make_plugin("p1", modifier=modifier, confidence=1.0))
     scorer = Scorer(registry)
     score, _ = scorer.run(base, REGION, TIME_RANGE, CROP_PROFILE)
     assert 0.0 <= score <= 1.0
+
+
+def test_scorer_run_returns_suitability_result():
+    registry = PluginRegistry()
+    scorer = Scorer(registry)
+    result = scorer.run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
+    assert isinstance(result, SuitabilityResult)
+    assert result.score == 0.5
+    assert result.confidence == 1.0
+
+
+def test_scorer_with_two_plugins_reflects_both_confidences(make_plugin):
+    # Two plugins with different confidence levels — aggregate_confidence
+    # must equal their average, proving both were called.
+    registry = PluginRegistry()
+    registry.register(make_plugin("p1", modifier=0.2, confidence=0.4))
+    registry.register(make_plugin("p2", modifier=0.2, confidence=0.8))
+    _, confidence = Scorer(registry).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
+    assert abs(confidence - 0.6) < 1e-9
+
+
+def test_scorer_with_mixed_plugins_only_accepting_ones_contribute(make_plugin):
+    class _RejectingPlugin(GroundshiftPlugin):
+        @property
+        def metadata(self) -> PluginMetadata:
+            return PluginMetadata(
+                plugin_id="rejector",
+                name="Rejector",
+                version="0.1.0",
+                description="",
+                author="Test",
+                compatible_crops=[],
+                data_sources=[],
+                requires_network=False,
+                phase_applicability=["describe"],
+            )
+
+        def validate_config(self, crop_profile: dict) -> bool:
+            return False
+
+        def fetch_data(self, region: BoundingBox, time_range: TimeRange) -> LayerData:
+            raise AssertionError("must not be called")
+
+        def score(self, layer_data: LayerData, crop_profile: dict) -> SuitabilityModifier:
+            raise AssertionError("must not be called")
+
+        def describe(self, score: SuitabilityModifier) -> str:
+            return ""
+
+    registry = PluginRegistry()
+    registry.register(make_plugin("accepting", modifier=0.3, confidence=1.0))
+    registry.register(_RejectingPlugin())
+
+    one = PluginRegistry()
+    one.register(make_plugin("accepting", modifier=0.3, confidence=1.0))
+
+    mixed_score, _ = Scorer(registry).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
+    one_score, _ = Scorer(one).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
+
+    assert mixed_score == one_score
 
 
 def test_scorer_skips_plugin_that_rejects_crop_profile():
