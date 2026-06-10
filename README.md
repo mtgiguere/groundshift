@@ -198,17 +198,23 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. Core data models, plugin infrastructure (ABC, registry, scorer), and modifier aggregation are implemented and fully tested. Phase 1 (Describe) — climate envelope scoring and imagery pipeline — is next.
+Active development. Core pipeline infrastructure is complete. The Describe phase is in progress — climate envelope scoring is fully built and spatially capable; the phase runner that orchestrates a full end-to-end run is next.
 
 | Component | Status |
 |---|---|
-| Core models (BoundingBox, TimeRange, SuitabilityModifier, LayerData, PluginMetadata, SuitabilityResult) | ✓ Complete |
-| Plugin modifier aggregator | ✓ Complete |
+| Core models (BoundingBox, TimeRange, LayerData, PluginMetadata) | ✓ Complete |
+| SuitabilityModifier (spatial — factor, probability, confidence as DataArrays) | ✓ Complete |
+| SuitabilityResult (spatial — score, confidence as DataArrays) | ✓ Complete |
 | Plugin base class (GroundshiftPlugin ABC) | ✓ Complete |
 | Plugin registry | ✓ Complete |
+| Three-tier aggregator (existential / stress / custom, envelope as hard gate) | ✓ Complete |
 | Scorer (plugin orchestration + aggregation) | ✓ Complete |
-| Climate envelope scorer (ClimateThreshold, EnvelopeScorer) | ✓ Complete |
+| ClimateThreshold + EnvelopeScorer (scalar + spatial DataArray) | ✓ Complete |
 | Crop profile YAML loader | ✓ Complete |
+| ClimateDataSource ABC | ✓ Complete |
+| compute_envelope (envelope pipeline step) | ✓ Complete |
+| DescribePhaseRunner (end-to-end Describe orchestration) | In progress |
+| WorldClim / ERA5 ClimateDataSource implementation | Planned |
 | Sentinel-2 / Landsat imagery pipeline | Planned |
 | CMIP6 projection pipeline | Planned |
 | Opportunity zone detector (Phase 3) | Planned |
