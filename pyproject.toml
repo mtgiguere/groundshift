@@ -9,7 +9,7 @@ description = "Open geospatial intelligence platform for crop climate suitabilit
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
-dependencies = ["pyyaml>=6.0", "xarray>=2024.1", "rioxarray>=0.15"]
+dependencies = ["pyyaml>=6.0", "xarray>=2024.1", "rioxarray>=0.15", "geopandas>=0.14"]
 
 [project.optional-dependencies]
 dev = [
