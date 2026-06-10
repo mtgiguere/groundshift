@@ -1,6 +1,8 @@
 from datetime import datetime
 
+import numpy as np
 import pytest
+import xarray as xr
 
 from groundshift.core.scorer import Scorer
 from groundshift.models.bounding_box import BoundingBox
@@ -17,89 +19,36 @@ TIME_RANGE = TimeRange(start=datetime(2022, 1, 1), end=datetime(2023, 1, 1))
 CROP_PROFILE: dict = {"crop_id": "coffee"}
 
 
-def test_scorer_with_no_plugins_returns_base_score():
+def _da(value: float) -> xr.DataArray:
+    return xr.DataArray(np.array([[value]]))
+
+
+def test_scorer_with_no_plugins_returns_envelope_unchanged():
     registry = PluginRegistry()
     scorer = Scorer(registry)
-    score, confidence = scorer.run(0.65, REGION, TIME_RANGE, CROP_PROFILE)
-    assert score == 0.65
-    assert confidence == 1.0
+    result = scorer.run(_da(0.65), REGION, TIME_RANGE, CROP_PROFILE)
+    assert float(result.score.mean()) == 0.65
+    assert float(result.confidence.mean()) == 1.0
 
 
-def test_scorer_applies_plugin_modifier_to_base_score(make_plugin):
+def test_scorer_returns_suitability_result():
     registry = PluginRegistry()
-    registry.register(make_plugin("p1", modifier=0.2, confidence=1.0))
-    scorer = Scorer(registry)
-    score, _ = scorer.run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
-    assert score > 0.5
-
-
-@pytest.mark.parametrize("base,modifier", [(0.95, 1.0), (0.05, -1.0)])
-def test_scorer_output_score_is_clamped_to_0_1(base: float, modifier: float, make_plugin):
-    registry = PluginRegistry()
-    registry.register(make_plugin("p1", modifier=modifier, confidence=1.0))
-    scorer = Scorer(registry)
-    score, _ = scorer.run(base, REGION, TIME_RANGE, CROP_PROFILE)
-    assert 0.0 <= score <= 1.0
-
-
-def test_scorer_run_returns_suitability_result():
-    registry = PluginRegistry()
-    scorer = Scorer(registry)
-    result = scorer.run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
+    result = Scorer(registry).run(_da(0.5), REGION, TIME_RANGE, CROP_PROFILE)
     assert isinstance(result, SuitabilityResult)
-    assert result.score == 0.5
-    assert result.confidence == 1.0
 
 
-def test_scorer_with_two_plugins_reflects_both_confidences(make_plugin):
-    # Two plugins with different confidence levels — aggregate_confidence
-    # must equal their average, proving both were called.
+def test_scorer_stress_plugin_reduces_score(make_plugin):
     registry = PluginRegistry()
-    registry.register(make_plugin("p1", modifier=0.2, confidence=0.4))
-    registry.register(make_plugin("p2", modifier=0.2, confidence=0.8))
-    _, confidence = Scorer(registry).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
-    assert abs(confidence - 0.6) < 1e-9
+    registry.register(make_plugin("p1", factor=0.5, probability=1.0, threat_tier="stress"))
+    result = Scorer(registry).run(_da(0.8), REGION, TIME_RANGE, CROP_PROFILE)
+    assert float(result.score.mean()) < 0.8
 
 
-def test_scorer_with_mixed_plugins_only_accepting_ones_contribute(make_plugin):
-    class _RejectingPlugin(GroundshiftPlugin):
-        @property
-        def metadata(self) -> PluginMetadata:
-            return PluginMetadata(
-                plugin_id="rejector",
-                name="Rejector",
-                version="0.1.0",
-                description="",
-                author="Test",
-                compatible_crops=[],
-                data_sources=[],
-                requires_network=False,
-                phase_applicability=["describe"],
-            )
-
-        def validate_config(self, crop_profile: dict) -> bool:
-            return False
-
-        def fetch_data(self, region: BoundingBox, time_range: TimeRange) -> LayerData:
-            raise AssertionError("must not be called")
-
-        def score(self, layer_data: LayerData, crop_profile: dict) -> SuitabilityModifier:
-            raise AssertionError("must not be called")
-
-        def describe(self, score: SuitabilityModifier) -> str:
-            return ""
-
+def test_scorer_zero_probability_plugin_leaves_score_unchanged(make_plugin):
     registry = PluginRegistry()
-    registry.register(make_plugin("accepting", modifier=0.3, confidence=1.0))
-    registry.register(_RejectingPlugin())
-
-    one = PluginRegistry()
-    one.register(make_plugin("accepting", modifier=0.3, confidence=1.0))
-
-    mixed_score, _ = Scorer(registry).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
-    one_score, _ = Scorer(one).run(0.5, REGION, TIME_RANGE, CROP_PROFILE)
-
-    assert mixed_score == one_score
+    registry.register(make_plugin("p1", factor=0.0, probability=0.0, threat_tier="stress"))
+    result = Scorer(registry).run(_da(0.8), REGION, TIME_RANGE, CROP_PROFILE)
+    assert float(result.score.mean()) == 0.8
 
 
 def test_scorer_skips_plugin_that_rejects_crop_profile():
@@ -116,23 +65,31 @@ def test_scorer_skips_plugin_that_rejects_crop_profile():
                 data_sources=[],
                 requires_network=False,
                 phase_applicability=["describe"],
+                threat_tier="stress",
             )
 
         def validate_config(self, crop_profile: dict) -> bool:
             return False
 
         def fetch_data(self, region: BoundingBox, time_range: TimeRange) -> LayerData:
-            raise AssertionError("fetch_data must not be called when validate_config returns False")
+            raise AssertionError("fetch_data must not be called")
 
         def score(self, layer_data: LayerData, crop_profile: dict) -> SuitabilityModifier:
-            raise AssertionError("score must not be called when validate_config returns False")
+            raise AssertionError("score must not be called")
 
         def describe(self, score: SuitabilityModifier) -> str:
             return ""
 
     registry = PluginRegistry()
     registry.register(_RejectingPlugin())
-    scorer = Scorer(registry)
-    result_score, result_confidence = scorer.run(0.7, REGION, TIME_RANGE, CROP_PROFILE)
-    assert result_score == 0.7
-    assert result_confidence == 1.0
+    result = Scorer(registry).run(_da(0.7), REGION, TIME_RANGE, CROP_PROFILE)
+    assert float(result.score.mean()) == 0.7
+    assert float(result.confidence.mean()) == 1.0
+
+
+def test_scorer_with_two_plugins_aggregates_confidence(make_plugin):
+    registry = PluginRegistry()
+    registry.register(make_plugin("p1", factor=1.0, confidence=0.4))
+    registry.register(make_plugin("p2", factor=1.0, confidence=0.8))
+    result = Scorer(registry).run(_da(0.5), REGION, TIME_RANGE, CROP_PROFILE)
+    assert float(result.confidence.mean()) == pytest.approx(0.6)

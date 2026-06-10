@@ -1,6 +1,9 @@
-from typing import NamedTuple
+from dataclasses import dataclass
+
+import xarray as xr
 
 
-class SuitabilityResult(NamedTuple):
-    score: float
-    confidence: float
+@dataclass
+class SuitabilityResult:
+    score: xr.DataArray
+    confidence: xr.DataArray

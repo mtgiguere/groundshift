@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Any
+
+import xarray as xr
 
 from groundshift.models.bounding_box import BoundingBox
 from groundshift.models.time_range import TimeRange
@@ -10,5 +11,5 @@ class LayerData:
     plugin_id: str
     region: BoundingBox
     time_range: TimeRange
-    data: Any
+    data: xr.DataArray
     metadata: dict
