@@ -177,13 +177,37 @@ class LayerData:
 class SuitabilityModifier:
     plugin_id: str
     region: BoundingBox
-    modifier_value: float       # [-1.0, 1.0] signed modifier
-    confidence: float           # [0.0, 1.0]
-    geometry: Any               # Shapely geometry or GeoDataFrame
-                                # Can be spatially variable — different
-                                # modifier values in different sub-regions
-    metadata: dict              # Anything useful for debugging or reporting
+    factor_value: xr.DataArray  # [0.0, 1.0] — severity if stressor occurs
+                                #   0.0 = stressor eliminates viability entirely
+                                #   1.0 = stressor has no effect
+    probability: xr.DataArray   # [0.0, 1.0] — likelihood stressor occurs at each cell
+    confidence: xr.DataArray    # [0.0, 1.0] — certainty of factor and probability estimates
+    metadata: dict              # Must include "threat_tier" (see Threat Tiers below).
+                                # Include "custom_weight" if threat_tier is "custom".
 ```
+
+`factor_value`, `probability`, and `confidence` are `xr.DataArray` grids — one value per
+geographic cell. A uniform modifier (same value everywhere) is a scalar DataArray:
+`xr.DataArray(np.array([[0.8]]))`. A spatially variable modifier uses a full grid.
+
+**The three fields are not redundant.** A plugin can be highly confident (`confidence=0.9`)
+that Coffee Leaf Rust would devastate a zone if it arrived, while the arrival probability
+this season is low (`probability=0.15`). Conflating these misrepresents both the science
+and the uncertainty. See Architecture docs for the full aggregation formula.
+
+**Threat tiers must be declared in `metadata`:**
+
+```python
+metadata={
+    "threat_tier": self.metadata.threat_tier,   # "existential" | "stress" | "custom"
+    "custom_weight": self.metadata.custom_weight,  # required if tier is "custom"
+}
+```
+
+The aggregator reads `metadata["threat_tier"]` to route each modifier into the correct
+tier. If `threat_tier` is missing from `metadata`, the modifier will silently be routed
+as a stress-tier modifier regardless of your declared intent. Always copy these fields
+from `PluginMetadata` into the modifier's `metadata` dict in your `score()` method.
 
 ---
 
@@ -257,20 +281,33 @@ class GroundwaterPlugin(GroundshiftPlugin):
         layer_data: LayerData,
         crop_profile: dict
     ) -> SuitabilityModifier:
+        import numpy as np
+        import xarray as xr
+
         tws = layer_data.data
 
-        # Negative anomaly = groundwater depletion
-        # Scale to [-1.0, 0.0] range — groundwater only suppresses, never amplifies
-        modifier = max(-1.0, tws.anomaly_mean / 50.0)  # normalize to cm scale
-        confidence = 0.7 if tws.record_length_years >= 10 else 0.4
+        # factor_value: 1.0 = no effect, 0.0 = eliminates viability entirely.
+        # Groundwater depletion reduces suitability — clamp to [0, 1].
+        raw_factor = 1.0 + (tws.anomaly_mean / 50.0)   # anomaly is negative → factor < 1
+        factor = float(np.clip(raw_factor, 0.0, 1.0))
+        conf = 0.7 if tws.record_length_years >= 10 else 0.4
+
+        # Wrap scalars as DataArrays — the aggregator expects spatial grids.
+        def _da(v: float) -> xr.DataArray:
+            return xr.DataArray(np.array([[v]]))
 
         return SuitabilityModifier(
             plugin_id=self.metadata.plugin_id,
             region=layer_data.region,
-            modifier_value=modifier,
-            confidence=confidence,
-            geometry=tws.geometry,
-            metadata={"anomaly_cm": tws.anomaly_mean, "record_years": tws.record_length_years}
+            factor_value=_da(factor),
+            probability=_da(1.0),       # groundwater depletion is a certain condition
+            confidence=_da(conf),
+            metadata={
+                "threat_tier": self.metadata.threat_tier,     # required by aggregator
+                "custom_weight": self.metadata.custom_weight, # required if tier is "custom"
+                "anomaly_cm": tws.anomaly_mean,
+                "record_years": tws.record_length_years,
+            },
         )
 
     def describe(self, score: SuitabilityModifier) -> str:
@@ -298,146 +335,116 @@ class GroundwaterPlugin(GroundshiftPlugin):
 
 ## Crop Profile Specification
 
-If you are adding a new crop rather than a plugin, you need a YAML crop profile. All pipeline behavior for a crop — envelope thresholds, imagery parameters, framing language — lives here.
+If you are adding a new crop rather than a plugin, you need a YAML crop profile. The pipeline is generic — adding a crop means writing a YAML file, not touching code.
+
+### Minimal profile (currently implemented)
+
+The minimum required for a working profile is `crop_id` and `climate_envelope.thresholds`.
+Each threshold variable maps to a `ClimateDataSource` variable name and defines a trapezoid
+scoring range: scores 1.0 inside the optimal band, 0.0 outside the viable range, interpolated
+in between.
 
 ```yaml
 # crop_profiles/your_crop.yaml
 
-# ── Identity ──────────────────────────────────────────────────────────────────
-name: Arabica Coffee                     # Display name
-profile_id: coffee                       # Used in CLI --crop flag
-scientific_name: Coffea arabica
-status: active                           # active | profile | stub
-version: "1.0.0"
-
-# Framing affects how outputs are described in reports
-smallholder_weight: high                 # high | medium | low
-framing:
-  loss_narrative: "smallholder livelihood threat"
-  gain_narrative: "emerging origin opportunity"
-  transition_narrative: "cooperative relocation and transition support"
-
-# ── Climate Envelope ──────────────────────────────────────────────────────────
-# All thresholds define the VIABLE range unless noted
-# optimal sub-ranges score higher within the viable range
+crop_id: your_crop                       # Used in CLI --crop flag
+name: Your Crop Display Name
+scientific_name: Species name
 
 climate_envelope:
-  temp_mean_annual:
-    optimal: [18, 22]         # °C
-    viable:  [15, 24]         # °C
-  temp_max_monthly:
-    stress_threshold: 30      # °C — above this = yield stress
-    fail_threshold:   34      # °C — above this = crop failure
-  temp_min_monthly:
-    frost_threshold:  2       # °C — below this = frost risk
-  precipitation_annual:
-    optimal: [1500, 2500]     # mm
-    viable:  [1000, 3000]     # mm
-  dry_season_months:
-    max: 3                    # months with <60mm rainfall
-  altitude_m:
-    optimal: [1000, 2000]     # metres ASL
-    viable:  [600,  2400]
+  thresholds:
+    mean_annual_temp_c:                  # must match a ClimateDataSource variable name
+      viable_min: 15.0
+      optimal_min: 18.0
+      optimal_max: 24.0
+      viable_max: 30.0
 
-# Quality scoring — separate from viability
-# These affect quality grade in Prescribe phase outputs
-quality_signals:
-  diurnal_temp_range:
-    min: 8                    # °C — drives cup quality
-  rainfall_distribution: bimodal   # bimodal | unimodal | any
+    annual_precipitation_mm:
+      viable_min: 1200.0
+      optimal_min: 1500.0
+      optimal_max: 2500.0
+      viable_max: 3000.0
 
-irrigation_dependent: false   # affects groundwater plugin compatibility
+    altitude_m:
+      viable_min: 600.0
+      optimal_min: 1000.0
+      optimal_max: 2000.0
+      viable_max: 3000.0
+```
 
-# ── Soil ─────────────────────────────────────────────────────────────────────
-soil:
-  ph_range: [5.5, 6.5]
-  drainage: well-drained       # well-drained | moderate | any
-  organic_matter: high         # high | medium | any
-  texture_preference: [loam, clay-loam, sandy-loam]
+The threshold variable names (`mean_annual_temp_c`, `annual_precipitation_mm`, `altitude_m`)
+must match the variable names supported by the active `ClimateDataSource`. Both
+`WorldClimSource` and `ERA5Source` support exactly these three variables.
 
-# ── Imagery ───────────────────────────────────────────────────────────────────
-imagery:
-  ndvi_healthy_threshold: 0.55    # above = healthy canopy
-  ndvi_stress_threshold:  0.40    # below = stress signal
-  ndvi_failure_threshold: 0.25    # below = likely abandonment
+### Calibration anchors
 
-  # When to acquire imagery for best crop signal (avoids cloud season)
-  optimal_composite_season: dry_season
+Calibration anchors are permanent reference zones that the pipeline scores on every run
+and alerts on when scores drop below expected minimums.
 
-  # Sentinel-2 band combination for change detection
-  change_detection_bands: [B8, B4, B3]   # NIR, Red, Green
-
-  # Minimum Landsat archive years for reliable trend analysis
-  min_trend_years: 10
-
-# ── Geographies ───────────────────────────────────────────────────────────────
+```yaml
 # Calibration anchors: permanent historical and scientific reference points.
-# These exist to validate model output and calibrate the suitability pipeline.
-# They are NOT claims about current or future suitability — a region can be
-# a calibration anchor and a climate stress zone simultaneously.
+# These exist to validate model output — NOT to declare current suitability.
+# A region can be a calibration anchor and a climate stress zone simultaneously.
 #
 # NEVER REMOVE an anchor, even if the region becomes severely climate-stressed.
 # A degrading anchor is either the most important signal in the dataset,
 # or evidence of a model error. Either way, you need it.
-#
-# Current production zones, stressed zones, and emerging zones are all
-# PIPELINE OUTPUTS — detected dynamically from SPAM + imagery + suitability
-# surfaces and written to dated GeoJSON files. They are never hardcoded here.
 calibration_anchors:
-  - id: ethiopia
-    name: Ethiopia
-    role: origin_center          # genetic diversity baseline, primary model ground truth
-    notes: "Coffea arabica origin. Jimma, Sidama, Yirgacheffe. High suitability
-            scores expected under current climate. Declining scores are a
-            meaningful signal — validate before assuming model error."
-  - id: colombia
-    name: Colombia
-    role: production_reference   # well-documented smallholder system
-    notes: "Andes elevation gradient provides a natural suitability transect
-            across altitude bands — ideal for validating envelope scoring."
-  - id: central_america
-    name: Central America
-    role: stress_reference       # already-degrading zone for loss model validation
-    notes: "Documented rust and heat stress already underway. Should score
-            declining under current and projected climate — validates the
-            loss detection pipeline."
+  - id: yirgacheffe_sidama               # unique id, snake_case
+    name: Yirgacheffe / Sidama           # human-readable name for output
+    role: origin_center                  # origin_center | production_reference | stress_reference
+    bbox: [37.0, 5.0, 40.0, 9.0]        # [min_lon, min_lat, max_lon, max_lat]
+    notes: "Coffea arabica origin. Declining scores here are the most important
+            signal the platform can produce."
 
-# Emergence criteria: the thresholds the pipeline uses to detect emerging
-# opportunity zones dynamically from live suitability surfaces.
-# Emerging regions are OUTPUTS of the pipeline, not inputs.
-# They are written to dated GeoJSON files and the database — never to this file.
-# These criteria define what qualifies as "emerging" for this crop.
+  - id: colombia_huila
+    name: Colombia Huila
+    role: production_reference           # alert if score < 0.60
+    bbox: [-76.5, 1.5, -74.5, 3.0]
+    notes: "Premium Colombian arabica. Active export at scale."
+
+  - id: central_america_stress
+    name: Central America Pacific Coast
+    role: stress_reference               # no minimum — declining score confirms model
+    bbox: [-90.0, 13.0, -87.0, 15.0]
+    notes: "Documented stress zone. High scores here indicate model failure."
+```
+
+**Role semantics:**
+
+| Role | Expected minimum score | Alert behaviour |
+|---|---|---|
+| `origin_center` | 0.70 | Alert if score < 0.70 |
+| `production_reference` | 0.60 | Alert if score < 0.60 |
+| `stress_reference` | None | Never alerts — declining score is confirmation |
+
+Anchors outside the current run region produce `n/a (outside region)` — not an alert.
+This is safe: `NaN < 0.70` is `False` in Python.
+
+### Full profile (planned fields)
+
+Additional fields for imagery analysis and emergence detection will be supported in
+later phases. The full specification is documented in ARCHITECTURE.md.
+
+```yaml
+# ── Imagery ───────────────────────────────────────────────────────────────────
+# (Planned — Describe phase imagery pipeline)
+imagery:
+  ndvi_healthy_threshold: 0.55
+  ndvi_stress_threshold:  0.40
+  ndvi_failure_threshold: 0.25
+  optimal_composite_season: dry_season
+  change_detection_bands: [B8, B4, B3]
+  min_trend_years: 10
+
+# ── Emergence criteria ────────────────────────────────────────────────────────
+# (Planned — Prescribe phase)
 emergence_criteria:
-  min_suitability_score: 0.65          # minimum score to qualify as emerging
-  min_suitability_trend_years: 5       # positive trend must hold for this many years
-  model_imagery_agreement: required    # both CMIP6 and imagery streams must agree
-  min_confidence: 0.60                 # discard low-confidence signals
-  max_current_cultivation_density: 0.05  # low existing cultivation = "emerging" not "established"
-
-# Confidence tier assignment — how many agreeing signals are required
-# for each confidence tier in the output. More signals = higher confidence.
-emergence_confidence_tiers:
-  high:   4    # all signals agree: CMIP6 + Sentinel-2 + Landsat trend + active plugins
-  medium: 3    # three signals agree
-  low:    2    # two signals agree (minimum to surface at all)
-
-# ── Plugin Compatibility ───────────────────────────────────────────────────────
-# Plugins that are particularly relevant for this crop
-recommended_plugins:
-  - climate_envelope      # always required
-  - imagery               # always required
-  - frost_risk            # relevant for highland zones
-  - pest_disease          # coffee leaf rust is critical
-
-# ── Data Sources ──────────────────────────────────────────────────────────────
-primary_data_sources:
-  - "FAO GAEZ v4 — coffee suitability baseline"
-  - "World Coffee Research — Varieties Catalog climate data"
-  - "CABI Crop Protection Compendium — Hemileia vastatrix"
-
-references:
-  - "Davis et al. (2012) — The impact of climate change on indigenous arabica coffee"
-  - "Bunn et al. (2015) — A bitter cup: climate change profile of global production"
+  min_suitability_score: 0.65
+  min_suitability_trend_years: 5
+  model_imagery_agreement: required
+  min_confidence: 0.60
+  max_current_cultivation_density: 0.05
 ```
 
 ---

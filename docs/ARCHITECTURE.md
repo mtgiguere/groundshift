@@ -95,6 +95,7 @@ groundshift/
 │   │   │   ├── climate_source.py        # ✓ ClimateDataSource ABC — fetch(variable, region, time_range)
 │   │   │   ├── climate_envelope.py      # ✓ compute_envelope(profile, source, region, time_range) → DataArray
 │   │   │   ├── worldclim_source.py      # ✓ WorldClimSource — file-backed ClimateDataSource, 1970-2000 baseline
+│   │   │   ├── era5_source.py           # ✓ ERA5Source — NetCDF-backed ClimateDataSource, 2015-present
 │   │   │   ├── cmip6_projector.py       # CMIP6 scenario projection — planned
 │   │   │   └── soil_matcher.py          # SoilGrids integration — planned
 │   │   ├── phases/
@@ -140,11 +141,17 @@ groundshift/
 │   │   ├── plugin_metadata.py           # ✓ plugin identity, threat_tier, custom_weight
 │   │   ├── suitability_modifier.py      # ✓ factor_value/probability/confidence as DataArrays
 │   │   ├── suitability_result.py        # ✓ score/confidence as DataArrays
-│   │   └── time_range.py               # ✓ start/end with scenario and horizon support
+│   │   ├── time_range.py                # ✓ start/end with scenario and horizon support
+│   │   ├── calibration_anchor.py        # ✓ CalibrationAnchor — role-validated reference zone
+│   │   └── anchor_score.py              # ✓ AnchorScore — per-run score + alert result
 │   │
 │   ├── db/
 │   │   ├── migrations/                  # Alembic migrations
 │   │   └── spatial_store.py             # PostGIS interface
+│   │
+│   ├── calibration/
+│   │   ├── anchor_loader.py             # ✓ load_anchors_from_profile(dict) → list[CalibrationAnchor]
+│   │   └── anchor_scorer.py             # ✓ score_anchors(result, anchors) → list[AnchorScore]
 │   │
 │   ├── regions/
 │   │   ├── __init__.py
@@ -173,10 +180,10 @@ groundshift/
 │   │   ├── models/                      # ✓ all models covered
 │   │   ├── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   │   ├── regions/                     # ✓ test_resolver.py
-│   │   ├── scripts/                     # ✓ test_download_worldclim
+│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5
 │   │   └── test_cli.py                  # ✓ argument parsing, required args, invalid phase
 │   ├── integration/
-│   │   └── test_describe_phase_smoke.py # ✓ full pipeline + CLI smoke test (requires WorldClim data)
+│   │   └── test_describe_phase_smoke.py # ✓ full pipeline + CLI + anchor smoke tests (requires WorldClim data)
 │   └── fixtures/                        # synthetic datasets — not yet written
 │
 ├── docs/
@@ -185,11 +192,16 @@ groundshift/
 │   ├── data_licenses.md
 │   └── data_sources.md
 │
+├── data/
+│   ├── worldclim/10m/                   # WorldClim GeoTIFFs (downloaded by ingest script, gitignored)
+│   └── era5/                            # ERA5 NetCDF files (downloaded by ingest script, gitignored)
+│
 ├── scripts/
 │   ├── __init__.py
 │   └── ingest/                          # One-time and scheduled ingestion
 │       ├── __init__.py
-│       └── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
+│       ├── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
+│       └── download_era5.py             # ✓ downloads ERA5 reanalysis to data/era5/ (requires cdsapi)
 │
 ├── infrastructure/
 │   └── aws/                             # Lambda, S3, RDS terraform/CDK
@@ -615,7 +627,7 @@ Implementations:
 | Implementation | Data | Phase | Status |
 |---|---|---|---|
 | `WorldClimSource` | Historical baseline climatology (1970–2000) | Describe | ✓ Complete |
-| `ERA5Source` | Recent observed climate (2015–present) | Describe | Planned |
+| `ERA5Source` | Recent observed climate (2015–present) | Describe | ✓ Complete |
 | `CMIP6Source` | Projected climate under SSP2/SSP5 scenarios | Predict | Planned |
 
 Each implementation clips to the requested `BoundingBox`, reprojects to EPSG:4326, and returns a consistently named DataArray. The pipeline is indifferent to which source is used — swap `WorldClimSource` for `CMIP6Source` and the same `compute_envelope` call produces a projected suitability surface instead of a current one.
@@ -805,7 +817,7 @@ GROUNDSHIFT_API_PORT=8000
 
 | Phase | Scope | Status |
 |---|---|---|
-| Phase 1 — Describe | Climate envelope pipeline complete (WorldClimSource, DescribePhaseRunner, CLI `run describe`). Imagery pipeline (Sentinel-2 NDVI, Landsat trend detection) next. | In Progress |
+| Phase 1 — Describe | Climate envelope complete: WorldClimSource + ERA5Source, DescribePhaseRunner, calibration anchor monitoring, CLI `groundshift run --phase describe`. Imagery pipeline (Sentinel-2 NDVI, Landsat trend detection) is next. | In Progress |
 | Phase 2 — Predict | CMIP6 projection pipeline, SSP2/SSP5 scenarios, scenario comparison | Planned |
 | Phase 3 — Prescribe | Opportunity zone detection, transition recommender, cooperative infrastructure layer | Planned |
 | API + delivery | REST API, web app, mobile app, offline package generation | Planned |

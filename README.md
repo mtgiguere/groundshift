@@ -42,13 +42,14 @@ Additional crop profiles (wine grape, olive, wheat, cocoa, tea) are included in 
 
 ## Key Capabilities
 
-- **Crop climate envelope modeling** — temperature, precipitation, soil, altitude thresholds with quality scoring distinct from viability scoring
-- **CMIP6 suitability projection** — SSP2 and SSP5 scenarios, 2040 / 2060 / 2100 horizons
-- **Satellite imagery analysis** — Sentinel-2 NDVI/EVI crop health, Landsat historical change detection (40+ year archive)
-- **Ground truth vs. model divergence detection** — where observed signals lead or lag projections
-- **Opportunity zone identification** — emerging suitability zones with infrastructure and market-access scoring
+- **Crop climate envelope modeling** — temperature, precipitation, altitude thresholds with trapezoid scoring (viable min/max, optimal min/max)
+- **Multiple climate data sources** — WorldClim v2.1 (1970–2000 baseline) and ERA5 reanalysis (2015–present) both implement the same `ClimateDataSource` interface; swap with a single argument
+- **Calibration anchor monitoring** — named reference zones (origin centers, production references, stress references) scored on every run; alerts fire when a documented high-suitability zone drops below threshold
+- **CMIP6 suitability projection** — SSP2 and SSP5 scenarios, 2040 / 2060 / 2100 horizons (planned)
+- **Satellite imagery analysis** — Sentinel-2 NDVI/EVI crop health, Landsat historical change detection (planned)
+- **Ground truth vs. model divergence detection** — where observed signals lead or lag projections (planned)
+- **Opportunity zone identification** — emerging suitability zones with infrastructure and market-access scoring (planned)
 - **Plugin architecture** — extensible evidence layers (pest/disease, frost risk, groundwater, land tenure) drop in without touching core logic
-- **Scenario comparison** — SSP2 vs. SSP5 side-by-side for any region
 - **Confidence visualization** — uncertainty surfaces alongside every suitability output
 
 ---
@@ -72,9 +73,8 @@ It is not designed for institutional investors or land acquisition. The framing,
 ### Prerequisites
 
 - Python 3.12+
-- PostgreSQL 15+ with PostGIS 3.4+
-- Docker (recommended)
-- AWS credentials (for S3 imagery access) or local Sentinel-2/Landsat data
+- WorldClim data on disk (see below) — ERA5 optional but recommended for current-period analysis
+- PostgreSQL 15+ with PostGIS 3.4+ (for future phases — not required for Describe phase)
 
 ### Installation
 
@@ -82,50 +82,61 @@ It is not designed for institutional investors or land acquisition. The framing,
 git clone https://github.com/mtgiguere/groundshift.git
 cd groundshift
 pip install -e ".[dev]"
-cp .env.example .env  # configure your database and API keys
+```
+
+### Download climate data
+
+```bash
+# WorldClim v2.1 — 1970–2000 climatological baseline (~300MB)
+python scripts/ingest/download_worldclim.py
+
+# ERA5 reanalysis — 2015–2024 recent observed climate (requires CDS API key)
+# See https://cds.climate.copernicus.eu/how-to-api to set up ~/.cdsapirc
+pip install -e ".[ingest]"   # installs cdsapi
+python scripts/ingest/download_era5.py
 ```
 
 ### Run your first analysis
 
 ```bash
-# Describe current coffee suitability in Ethiopia
-python -m groundshift run \
-  --crop coffee \
-  --region ethiopia \
-  --phase describe \
-  --output ./outputs/ethiopia_coffee_describe
+# Describe current coffee suitability in Ethiopia (WorldClim baseline)
+groundshift run --crop coffee --region ethiopia --phase describe
 
-# Full three-phase analysis
-python -m groundshift run \
-  --crop coffee \
-  --region colombia \
-  --phase all \
-  --scenarios ssp245 ssp585 \
-  --output ./outputs/colombia_coffee_full
+# Sample output:
+# Groundshift — Describe phase
+#   crop:    coffee
+#   region:  ethiopia
+#   cells:   6017 scored, 655 viable (score > 0)
+#   score:   min=0.000  mean=0.073  max=1.000
+#
+#   calibration anchors:
+#     [origin_center] Yirgacheffe / Sidama: 0.812  (expected >= 0.70)
+#     [production_reference] Colombia Huila: n/a (outside region)  (expected >= 0.60)
+#     [stress_reference] Central America Pacific Coast: n/a (outside region)  (stress reference — no floor)
 ```
 
 ### Run tests
 
 ```bash
-pytest                   # full suite
-pytest -m unit           # unit tests only
-pytest -m integration    # requires live database and credentials
+pytest                   # full suite (unit + integration)
+pytest -m unit           # unit tests only (no data files required)
+pytest -m integration    # requires WorldClim data on disk
 ```
 
 ---
 
 ## Crop Profiles
 
-Groundshift ships with the following crop profiles. Each profile defines the complete climate envelope, imagery parameters, and framing for the three-phase pipeline.
+Groundshift ships with the following crop profiles. Each profile defines the complete climate envelope and calibration anchors for the pipeline.
 
-| Crop | Status | Primary Stress Region | Primary Opportunity Region |
-|---|---|---|---|
-| Arabica coffee | Active | Ethiopia, Colombia, Central America | Rwanda highlands, emerging elevation bands |
-| Wine grape | Profile included | Burgundy, Napa, Rioja | England, Scandinavia, Tasmania |
-| Olive | Profile included | Spain, Italy | UK, Pacific Northwest, New Zealand |
-| Wheat | Profile included | South Asia, MENA | Canadian prairies, Siberia |
-| Cocoa | Profile stub | Ghana, Ivory Coast | East Africa highlands |
-| Tea | Profile stub | Darjeeling, Assam | Scottish Highlands (emerging) |
+| Crop | Status | Calibration anchors |
+|---|---|---|
+| Arabica coffee | Active | Yirgacheffe/Sidama (origin), Colombia Huila (production), Central America Pacific (stress) |
+| Wine grape | Profile included | — |
+| Olive | Profile included | — |
+| Wheat | Profile included | — |
+| Cocoa | Profile stub | — |
+| Tea | Profile stub | — |
 
 Adding a new crop requires only a YAML profile. See [PLUGIN.md](docs/PLUGIN.md) for the crop profile specification.
 
@@ -133,13 +144,9 @@ Adding a new crop requires only a YAML profile. See [PLUGIN.md](docs/PLUGIN.md) 
 
 ## Plugin System
 
-Groundshift is designed for extensibility. Evidence layers beyond the core climate envelope and imagery analysis are implemented as plugins that drop into the pipeline without modifying core logic.
+Groundshift is designed for extensibility. Evidence layers beyond the core climate envelope are implemented as plugins that drop into the pipeline without modifying core logic.
 
-**Builtin plugins (shipped):**
-- `climate_envelope` — CMIP6 + FAO GAEZ suitability scoring
-- `imagery` — Sentinel-2 + Landsat NDVI and change detection
-
-**Stretch plugins (interfaces defined, implementations in progress):**
+**Stretch plugins (interfaces defined, implementations planned):**
 - `pest_disease` — Coffee leaf rust, grapevine downy mildew, wheat blast range expansion
 - `frost_risk` — Daily temperature extremes, late frost event modeling
 - `groundwater` — GRACE aquifer depletion surfaces
@@ -163,20 +170,23 @@ Groundshift is built under strict TDD discipline. Every pipeline component has t
 
 AI-assisted development (Claude Code) is used throughout, operating under the same TDD discipline: no untested code merges regardless of how it was generated.
 
+See [TDD_CONTRACT.md](TDD_CONTRACT.md) for the evidence base behind this discipline, including bugs caught and prevented in real development sessions on this codebase.
+
 ---
 
 ## Data Sources
 
-| Data | Source | License |
-|---|---|---|
-| Climate projections | CMIP6 (ESGF) | CC BY 4.0 |
-| Crop suitability baselines | FAO GAEZ v4 | CC BY-NC 4.0 |
-| Satellite imagery | Sentinel-2 (ESA/AWS) | CC BY 4.0 |
-| Historical imagery | Landsat (USGS/AWS) | Public domain |
-| Soil properties | SoilGrids 250m (ISRIC) | CC BY 4.0 |
-| Surface water | JRC Global Surface Water | CC BY 4.0 |
-| Smallholder farm locations | SPAM 2020 (IFPRI) | CC BY 4.0 |
-| Crop production data | World Coffee Research | Various |
+| Data | Source | License | Status |
+|---|---|---|---|
+| Climate baseline (1970–2000) | WorldClim v2.1 | CC BY 4.0 | ✓ Integrated |
+| Recent observed climate (2015–present) | ERA5 (Copernicus/ECMWF) | Copernicus licence | ✓ Integrated |
+| Climate projections | CMIP6 (ESGF) | CC BY 4.0 | Planned |
+| Crop suitability baselines | FAO GAEZ v4 | CC BY-NC 4.0 | Planned |
+| Satellite imagery | Sentinel-2 (ESA/AWS) | CC BY 4.0 | Planned |
+| Historical imagery | Landsat (USGS/AWS) | Public domain | Planned |
+| Soil properties | SoilGrids 250m (ISRIC) | CC BY 4.0 | Planned |
+| Surface water | JRC Global Surface Water | CC BY 4.0 | Planned |
+| Smallholder farm locations | SPAM 2020 (IFPRI) | CC BY 4.0 | Planned |
 
 ---
 
@@ -184,13 +194,13 @@ AI-assisted development (Claude Code) is used throughout, operating under the sa
 
 MIT License. See LICENSE for details.
 
-Data sources carry their own licenses — see the table above and `docs/data_licenses.md` for full attribution requirements.
+Data sources carry their own licenses — see the table above for status and attribution requirements.
 
 ---
 
 ## Contributing
 
-Groundshift welcomes contributions, especially crop profiles, regional data integrations, and plugin implementations. Please read [PLUGIN.md](PLUGIN.md) before writing any plugin code, and ensure full test coverage accompanies any submission.
+Groundshift welcomes contributions, especially crop profiles, regional data integrations, and plugin implementations. Please read [PLUGIN.md](docs/PLUGIN.md) before writing any plugin code, and ensure full test coverage accompanies any submission.
 
 Open an issue before beginning significant work — coordination avoids duplication.
 
@@ -198,25 +208,30 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe phase climate envelope pipeline is complete — envelope scoring, WorldClim data source, and end-to-end phase runner are all built and tested. The imagery analysis layer (Sentinel-2 NDVI, Landsat trend detection) is next for the Describe phase.
+Active development. The Describe phase climate envelope pipeline is complete and runnable end-to-end from the CLI. The imagery analysis layer (Sentinel-2 NDVI, Landsat trend detection) is next.
 
 | Component | Status |
 |---|---|
 | Core models (BoundingBox, TimeRange, LayerData, PluginMetadata) | ✓ Complete |
-| SuitabilityModifier (spatial — factor, probability, confidence as DataArrays) | ✓ Complete |
-| SuitabilityResult (spatial — score, confidence as DataArrays) | ✓ Complete |
+| SuitabilityModifier (factor_value, probability, confidence as DataArrays) | ✓ Complete |
+| SuitabilityResult (score, confidence as DataArrays) | ✓ Complete |
 | Plugin base class (GroundshiftPlugin ABC) | ✓ Complete |
 | Plugin registry | ✓ Complete |
 | Three-tier aggregator (existential / stress / custom, envelope as hard gate) | ✓ Complete |
 | Scorer (plugin orchestration + aggregation) | ✓ Complete |
-| ClimateThreshold + EnvelopeScorer (scalar + spatial DataArray) | ✓ Complete |
+| ClimateThreshold + EnvelopeScorer (trapezoid scoring, scalar + spatial DataArray) | ✓ Complete |
 | Crop profile YAML loader | ✓ Complete |
 | ClimateDataSource ABC | ✓ Complete |
 | compute_envelope (envelope pipeline step) | ✓ Complete |
-| WorldClimSource (1970–2000 baseline ClimateDataSource) | ✓ Complete |
-| Raster utility (geodataframe_to_modifier — GeoDataFrame → SuitabilityModifier) | ✓ Complete |
+| WorldClimSource (1970–2000 baseline) | ✓ Complete |
+| ERA5Source (2015–present reanalysis) | ✓ Complete |
+| Calibration anchor model + loader + scorer | ✓ Complete |
+| Regions resolver (Ethiopia, Colombia, Central America) | ✓ Complete |
 | DescribePhaseRunner (end-to-end Describe orchestration) | ✓ Complete |
-| ERA5Source (recent observed climate ClimateDataSource) | Planned |
+| CLI (`groundshift run --crop --region --phase`) | ✓ Complete |
+| Raster utility (geodataframe_to_modifier) | ✓ Complete |
+| WorldClim download script | ✓ Complete |
+| ERA5 download script | ✓ Complete |
 | Sentinel-2 / Landsat imagery pipeline | Planned |
 | CMIP6 projection pipeline | Planned |
 | Opportunity zone detector (Phase 3) | Planned |
