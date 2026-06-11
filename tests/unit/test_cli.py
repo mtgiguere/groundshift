@@ -7,6 +7,7 @@ import xarray as xr
 from groundshift.cli import build_arg_parser, run_describe, run_predict, run_prescribe
 from groundshift.models.describe_result import DescribeResult
 from groundshift.models.divergence_result import DivergenceResult
+from groundshift.models.opportunity_zone import OpportunityZone, OpportunityZoneResult
 from groundshift.models.predict_result import PredictProjection, PredictResult
 from groundshift.models.prescribe_result import ChangeProjection, PrescribeResult
 from groundshift.models.suitability_result import SuitabilityResult
@@ -45,6 +46,16 @@ def _fake_prescribe_result() -> PrescribeResult:
         change_projections=[
             ChangeProjection("ssp245", 2040, delta),
             ChangeProjection("ssp585", 2100, delta * -1),
+        ]
+    )
+
+
+def _fake_opportunity_zone_result() -> OpportunityZoneResult:
+    mask = xr.DataArray(np.array([[True, False], [True, False]]))
+    return OpportunityZoneResult(
+        zones=[
+            OpportunityZone("ssp245", 2040, mask, "low"),
+            OpportunityZone("ssp585", 2100, mask, "low"),
         ]
     )
 
@@ -359,3 +370,36 @@ class TestRunPrescribe:
         assert "gaining" in out
         assert "losing" in out
         assert "mean_delta" in out
+
+    def test_opportunity_zones_header_printed(self, capsys):
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=_fake_describe_result()):
+            with patch(
+                "groundshift.cli.PredictPhaseRunner.run", return_value=_fake_predict_result()
+            ):
+                with patch(
+                    "groundshift.cli.PrescribePhaseRunner.run",
+                    return_value=_fake_prescribe_result(),
+                ):
+                    with patch(
+                        "groundshift.cli.GainZoneDetector.detect",
+                        return_value=_fake_opportunity_zone_result(),
+                    ):
+                        run_prescribe(self._args())
+        assert "opportunity" in capsys.readouterr().out.lower()
+
+    def test_opportunity_zones_cell_count_printed(self, capsys):
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=_fake_describe_result()):
+            with patch(
+                "groundshift.cli.PredictPhaseRunner.run", return_value=_fake_predict_result()
+            ):
+                with patch(
+                    "groundshift.cli.PrescribePhaseRunner.run",
+                    return_value=_fake_prescribe_result(),
+                ):
+                    with patch(
+                        "groundshift.cli.GainZoneDetector.detect",
+                        return_value=_fake_opportunity_zone_result(),
+                    ):
+                        run_prescribe(self._args())
+        out = capsys.readouterr().out
+        assert "cells" in out

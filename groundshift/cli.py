@@ -12,6 +12,7 @@ from groundshift.core.envelope.era5_source import ERA5Source
 from groundshift.core.envelope.worldclim_source import WorldClimSource
 from groundshift.core.envelope.yaml_loader import load_profile_from_yaml
 from groundshift.core.imagery.sentinel2_source import Sentinel2Source
+from groundshift.core.opportunity.gain_zone_detector import GainZoneDetector
 from groundshift.core.phases.describe import DescribePhaseRunner
 from groundshift.core.phases.predict import PredictPhaseRunner
 from groundshift.core.phases.prescribe import PrescribePhaseRunner
@@ -199,6 +200,7 @@ def run_prescribe(args: argparse.Namespace) -> None:
         )
 
     result = PrescribePhaseRunner().run(describe_result, predict_result)
+    opportunity = GainZoneDetector().detect(describe_result, result)
 
     print("Groundshift — Prescribe phase")
     print(f"  crop:    {args.crop}")
@@ -218,6 +220,13 @@ def run_prescribe(args: argparse.Namespace) -> None:
             f"gaining={gaining:>4}  losing={losing:>4}  "
             f"mean_delta={sign}{mean_delta:.3f}"
         )
+
+    print()
+    print("  opportunity zones (emerging — currently low suitability, meaningfully gaining):")
+    for zone in opportunity.zones:
+        cell_count = int(zone.mask.values.sum())
+        label = f"[{zone.scenario} / {zone.horizon_year}]"
+        print(f"  {label:<18}  {cell_count:>4} cells  confidence={zone.confidence}")
 
 
 def main() -> None:
