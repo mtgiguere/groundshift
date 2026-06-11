@@ -124,7 +124,7 @@ groundshift/
 │   │       ├── crops.py                 # ✓ GET /api/v1/crops, GET /api/v1/crops/{id}
 │   │       ├── regions.py               # ✓ GET /api/v1/regions, GET /api/v1/regions/{id}
 │   │       ├── emerging.py              # ✓ GET /api/v1/crops/{id}/emerging — serves pre-computed JSON results
-│   │       ├── runs.py                  # GET /api/v1/runs, GET /api/v1/runs/{id}/surfaces — planned
+│   │       ├── runs.py                  # ✓ GET /api/v1/runs — lists results, filterable by crop_id / region_id
 │   │       └── packages.py              # GET /api/v1/packages/{crop}/{region} — planned
 │   │
 │   ├── plugins/
@@ -215,6 +215,7 @@ groundshift/
 ├── scripts/
 │   ├── __init__.py
 │   ├── export_emerging.py               # ✓ runs prescribe pipeline, writes emerging zone JSON for API
+│   ├── export_mbtiles.py                # ✓ converts zone mask (xr.DataArray) to MBTiles for CivTAK offline
 │   └── ingest/                          # One-time and scheduled ingestion
 │       ├── __init__.py
 │       ├── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
@@ -281,8 +282,8 @@ Each analysis run executes one or more phases in sequence. Phases share a common
 
 **Implemented:**
 - `PrescribePhaseRunner` computes signed per-cell delta surfaces (projected − current suitability) for each scenario+horizon combination using `DescribeResult` and `PredictResult`.
-- `GainZoneDetector` scans those delta surfaces for opportunity zones — cells currently below a suitability threshold but gaining meaningfully. Outputs one boolean mask per scenario+horizon with confidence `"low"` (single CMIP6 signal; medium/high tiers require Landsat trend and plugin agreement — not yet implemented).
-- `LossZoneDetector` is the mirror counterpart — cells currently above the suitability threshold but declining significantly. Same per-scenario+horizon boolean mask output, same confidence model.
+- `GainZoneDetector` scans those delta surfaces for opportunity zones — cells currently below a suitability threshold but gaining meaningfully. Outputs one boolean mask per scenario+horizon. Confidence is `"low"` (CMIP6 only), `"medium"` (CMIP6 + Landsat or Sentinel-2 agrees), or `"high"` (all three agree). Signal agreement is tested via median of the full signal surface rather than masked cells, avoiding resolution mismatch issues between CMIP6, Landsat, and Sentinel-2 grids.
+- `LossZoneDetector` is the mirror counterpart — cells currently above the suitability threshold but declining significantly. Same per-scenario+horizon boolean mask and same confidence tier logic, with signs flipped: Landsat must show negative slope, Sentinel-2 must show positive divergence.
 - `TransitionRecommender` takes the current crop profile and a list of candidate profiles and ranks them by Jaccard overlap of their viable climate ranges, averaged across all shared variables. Score of 1.0 means identical envelope; 0.0 means no overlap. This answers: *given that this region suits crop X, which alternatives have the most similar requirements?*
 - All three are wired into `run_prescribe`; the CLI prints opportunity zone counts, loss zone counts, and transition suggestions per scenario+horizon.
 
@@ -304,11 +305,12 @@ Cooperative infrastructure context is next.
 
 **Key design note on emerging region detection:** Emerging opportunity zones are **outputs of the pipeline, not inputs**. They are never hardcoded in crop profiles. The pipeline scans suitability surfaces against each crop's `emergence_criteria` thresholds and assigns confidence tiers based on signal agreement:
 
-| Confidence tier | Signals required |
-|---|---|
-| High | CMIP6 + Sentinel-2 + Landsat trend + active plugins all agree |
-| Medium | Any three of the above agree |
-| Low | Any two agree (minimum threshold to surface at all) |
+| Confidence tier | Signals required | Status |
+|---|---|---|
+| High | CMIP6 + Sentinel-2 divergence + Landsat trend all agree | ✓ Implemented |
+| Medium | Any two of the above agree | ✓ Implemented |
+| Low | CMIP6 only (minimum threshold to surface at all) | ✓ Implemented |
+| High (extended) | Above + active plugins agree | Planned (awaits plugin signals) |
 
 **Emerging region persistence:** A region's confidence tier can increase over time as more imagery accumulates, or decrease if trend data reverses. To prevent spurious oscillation (e.g. a zone bouncing in and out of the list due to cloud contamination or seasonal Sentinel-2 variation), a minimum persistence rule applies: a zone must score at or above the `low` confidence threshold for at least `emergence_criteria.min_suitability_trend_years` consecutive years before appearing in outputs. Once surfaced, it is retained until it fails the threshold for two consecutive runs. The full history of scores is always preserved in `emerging_regions` — the persistence rule only governs what appears in dated GeoJSON exports.
 
@@ -494,7 +496,7 @@ The REST API is the delivery boundary between pipeline artifacts and all clients
 | `GET /api/v1/regions` | ✓ Live | List named regions with bounding boxes |
 | `GET /api/v1/regions/{id}` | ✓ Live | Single region detail |
 | `GET /api/v1/crops/{id}/emerging` | ✓ Live | Pre-computed opportunity zone results; `?region=` filter supported |
-| `GET /api/v1/runs` | Planned | List pipeline runs with status |
+| `GET /api/v1/runs` | ✓ Live | List computed results; `?crop_id=` and `?region_id=` filters supported |
 | `GET /api/v1/runs/{run_id}/surfaces` | Planned | Suitability surfaces for a completed run |
 | `GET /api/v1/packages/{crop_id}/{region_id}` | Planned | Download pre-generated offline package |
 
@@ -908,6 +910,6 @@ GROUNDSHIFT_API_PORT=8000
 | Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source + LandsatSource, DescribePhaseRunner, calibration anchor monitoring, NDVI divergence surface, Landsat historical trend surface, CLI `groundshift run --phase describe --source --imagery`. | ✓ Functional |
 | Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. | ✓ Functional |
 | Phase 3 — Prescribe | Delta surfaces, opportunity zone detection, loss zone detection, and transition recommendations complete. `PrescribePhaseRunner` + `GainZoneDetector` + `LossZoneDetector` + `TransitionRecommender`; CLI prints gaining/losing cells, opportunity zone counts, loss zone counts, and ranked transition suggestions per scenario+horizon. Cooperative infrastructure context is next. | ✓ Mostly functional |
-| API + delivery | `GET /api/v1/crops`, `GET /api/v1/crops/{id}`, `GET /api/v1/regions`, `GET /api/v1/regions/{id}`, `GET /api/v1/crops/{id}/emerging` all live. Runs, packages endpoints planned. Web app, mobile, offline generation planned. | ✓ Partially functional |
+| API + delivery | `GET /api/v1/crops`, `GET /api/v1/crops/{id}`, `GET /api/v1/regions`, `GET /api/v1/regions/{id}`, `GET /api/v1/crops/{id}/emerging`, `GET /api/v1/runs` all live. `scripts/export_mbtiles.py` delivers MBTiles for CivTAK offline use. Packages endpoint and KMZ export planned. | ✓ Mostly functional |
 | Plugin expansion | Frost risk, pest/disease, phenology plugins | Planned |
 | Additional crops | Wine grape, olive, wheat profiles production-ready | Planned |
