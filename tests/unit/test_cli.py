@@ -4,10 +4,11 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from groundshift.cli import build_arg_parser, run_describe, run_predict
+from groundshift.cli import build_arg_parser, run_describe, run_predict, run_prescribe
 from groundshift.models.describe_result import DescribeResult
 from groundshift.models.divergence_result import DivergenceResult
 from groundshift.models.predict_result import PredictProjection, PredictResult
+from groundshift.models.prescribe_result import ChangeProjection, PrescribeResult
 from groundshift.models.suitability_result import SuitabilityResult
 
 # ---------------------------------------------------------------------------
@@ -34,6 +35,16 @@ def _fake_predict_result() -> PredictResult:
         projections=[
             PredictProjection("ssp245", 2040, _fake_suitability()),
             PredictProjection("ssp585", 2100, _fake_suitability()),
+        ]
+    )
+
+
+def _fake_prescribe_result() -> PrescribeResult:
+    delta = xr.DataArray(np.array([[0.1, -0.2], [0.3, -0.1]]))
+    return PrescribeResult(
+        change_projections=[
+            ChangeProjection("ssp245", 2040, delta),
+            ChangeProjection("ssp585", 2100, delta * -1),
         ]
     )
 
@@ -77,6 +88,14 @@ def test_predict_phase_is_accepted():
         ["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "predict"]
     )
     assert args.phase == "predict"
+
+
+def test_prescribe_phase_is_accepted():
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        ["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "prescribe"]
+    )
+    assert args.phase == "prescribe"
 
 
 def test_run_invalid_phase_exits_with_error():
@@ -280,3 +299,63 @@ class TestRunPredict:
         assert "ssp585" in out
         assert "2040" in out
         assert "2100" in out
+
+
+# ---------------------------------------------------------------------------
+# run_prescribe execution tests
+# ---------------------------------------------------------------------------
+
+
+class TestRunPrescribe:
+    def _args(self, crop="coffee", region="ethiopia"):
+        return build_arg_parser().parse_args(
+            ["run", "--crop", crop, "--region", region, "--phase", "prescribe"]
+        )
+
+    def test_unknown_region_raises_system_exit(self):
+        with pytest.raises(SystemExit, match="Unknown region"):
+            run_prescribe(self._args(region="nowhere_land"))
+
+    def test_missing_profile_raises_system_exit(self):
+        with pytest.raises(SystemExit, match="Crop profile not found"):
+            run_prescribe(self._args(crop="no_such_crop_xyz"))
+
+    def test_missing_data_raises_system_exit(self):
+        with patch(
+            "groundshift.cli.DescribePhaseRunner.run",
+            side_effect=FileNotFoundError("worldclim_mean_annual_temp_c.tif"),
+        ):
+            with pytest.raises(SystemExit, match="Required data not found"):
+                run_prescribe(self._args())
+
+    def test_happy_path_prints_prescribe_header(self, capsys):
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=_fake_describe_result()):
+            with patch(
+                "groundshift.cli.PredictPhaseRunner.run", return_value=_fake_predict_result()
+            ):
+                with patch(
+                    "groundshift.cli.PrescribePhaseRunner.run",
+                    return_value=_fake_prescribe_result(),
+                ):
+                    run_prescribe(self._args())
+        out = capsys.readouterr().out
+        assert "Prescribe phase" in out
+        assert "coffee" in out
+        assert "ethiopia" in out
+
+    def test_happy_path_prints_one_line_per_change_projection(self, capsys):
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=_fake_describe_result()):
+            with patch(
+                "groundshift.cli.PredictPhaseRunner.run", return_value=_fake_predict_result()
+            ):
+                with patch(
+                    "groundshift.cli.PrescribePhaseRunner.run",
+                    return_value=_fake_prescribe_result(),
+                ):
+                    run_prescribe(self._args())
+        out = capsys.readouterr().out
+        assert "ssp245" in out
+        assert "ssp585" in out
+        assert "gaining" in out
+        assert "losing" in out
+        assert "mean_delta" in out

@@ -14,6 +14,7 @@ from groundshift.core.envelope.yaml_loader import load_profile_from_yaml
 from groundshift.core.imagery.sentinel2_source import Sentinel2Source
 from groundshift.core.phases.describe import DescribePhaseRunner
 from groundshift.core.phases.predict import PredictPhaseRunner
+from groundshift.core.phases.prescribe import PrescribePhaseRunner
 from groundshift.models.time_range import TimeRange
 from groundshift.plugins.registry import PluginRegistry
 from groundshift.regions.resolver import UnknownRegionError, resolve_region
@@ -44,7 +45,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--phase",
         required=True,
-        choices=["describe", "predict"],
+        choices=["describe", "predict", "prescribe"],
         help="Pipeline phase to execute.",
     )
     run.add_argument(
@@ -166,11 +167,66 @@ def run_predict(args: argparse.Namespace) -> None:
         )
 
 
+def run_prescribe(args: argparse.Namespace) -> None:
+    try:
+        region = resolve_region(args.region)
+    except UnknownRegionError:
+        raise SystemExit(
+            f"Unknown region '{args.region}'. "
+            "Check groundshift/regions/resolver.py for available regions."
+        )
+
+    profile_path = Path(__file__).parents[1] / "crop_profiles" / f"{args.crop}.yaml"
+    if not profile_path.exists():
+        raise SystemExit(f"Crop profile not found: {profile_path}")
+
+    profile = load_profile_from_yaml(profile_path)
+
+    try:
+        describe_result = DescribePhaseRunner(
+            WorldClimSource(_WORLDCLIM_DIR), PluginRegistry()
+        ).run(profile, region, _WORLDCLIM_TIME_RANGE)
+        predict_result = PredictPhaseRunner(
+            CMIP6Source(_CMIP6_DIR),
+            PluginRegistry(),
+            scenarios=_CMIP6_SCENARIOS,
+            horizons=_CMIP6_HORIZONS,
+        ).run(profile, region, _CMIP6_TIME_RANGE)
+    except FileNotFoundError as exc:
+        raise SystemExit(
+            f"Required data not found: {exc}\n"
+            "Run download_worldclim.py and download_cmip6.py first."
+        )
+
+    result = PrescribePhaseRunner().run(describe_result, predict_result)
+
+    print("Groundshift — Prescribe phase")
+    print(f"  crop:    {args.crop}")
+    print(f"  region:  {args.region}")
+    print()
+
+    for proj in result.change_projections:
+        delta = proj.delta.values
+        finite = delta[~np.isnan(delta)]
+        gaining = int((finite > 0).sum())
+        losing = int((finite < 0).sum())
+        mean_delta = finite.mean()
+        sign = "+" if mean_delta >= 0 else ""
+        label = f"[{proj.scenario} / {proj.horizon_year}]"
+        print(
+            f"  {label:<18}  "
+            f"gaining={gaining:>4}  losing={losing:>4}  "
+            f"mean_delta={sign}{mean_delta:.3f}"
+        )
+
+
 def main() -> None:
     parser = build_arg_parser()
     args = parser.parse_args()
     if args.command == "run":
         if args.phase == "predict":
             run_predict(args)
+        elif args.phase == "prescribe":
+            run_prescribe(args)
         else:
             run_describe(args)
