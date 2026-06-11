@@ -3,9 +3,11 @@ import xarray as xr
 
 from groundshift.core.opportunity.loss_zone_detector import LossZoneDetector
 from groundshift.models.describe_result import DescribeResult
+from groundshift.models.divergence_result import DivergenceResult
 from groundshift.models.loss_zone import LossZoneResult
 from groundshift.models.prescribe_result import ChangeProjection, PrescribeResult
 from groundshift.models.suitability_result import SuitabilityResult
+from groundshift.models.trend_result import TrendResult
 
 
 def _describe(current_scores) -> DescribeResult:
@@ -76,6 +78,44 @@ class TestLossZoneDetector:
     def test_confidence_is_low_for_single_signal(self):
         result = LossZoneDetector().detect(_describe([[0.8]]), _prescribe([[-0.5]]))
         assert result.zones[0].confidence == "low"
+
+    def test_confidence_is_medium_with_supporting_landsat(self):
+        d = _describe([[0.8]])
+        d.trend = TrendResult(slope=xr.DataArray(np.array([[-0.003]])))  # negative → loss
+        result = LossZoneDetector().detect(d, _prescribe([[-0.5]]))
+        assert result.zones[0].confidence == "medium"
+
+    def test_confidence_is_medium_with_supporting_sentinel2(self):
+        d = _describe([[0.8]])
+        d.divergence = DivergenceResult(surface=xr.DataArray(np.array([[0.2]])))  # positive → loss
+        result = LossZoneDetector().detect(d, _prescribe([[-0.5]]))
+        assert result.zones[0].confidence == "medium"
+
+    def test_confidence_is_high_with_both_supporting(self):
+        d = _describe([[0.8]])
+        d.trend = TrendResult(slope=xr.DataArray(np.array([[-0.003]])))
+        d.divergence = DivergenceResult(surface=xr.DataArray(np.array([[0.2]])))
+        result = LossZoneDetector().detect(d, _prescribe([[-0.5]]))
+        assert result.zones[0].confidence == "high"
+
+    def test_confidence_stays_low_when_landsat_contradicts(self):
+        d = _describe([[0.8]])
+        d.trend = TrendResult(slope=xr.DataArray(np.array([[0.003]])))  # positive → contradicts
+        result = LossZoneDetector().detect(d, _prescribe([[-0.5]]))
+        assert result.zones[0].confidence == "low"
+
+    def test_confidence_stays_low_when_sentinel2_contradicts(self):
+        d = _describe([[0.8]])
+        d.divergence = DivergenceResult(surface=xr.DataArray(np.array([[-0.2]])))
+        result = LossZoneDetector().detect(d, _prescribe([[-0.5]]))
+        assert result.zones[0].confidence == "low"
+
+    def test_confidence_medium_when_one_supports_one_contradicts(self):
+        d = _describe([[0.8]])
+        d.trend = TrendResult(slope=xr.DataArray(np.array([[-0.003]])))  # supports
+        d.divergence = DivergenceResult(surface=xr.DataArray(np.array([[-0.2]])))  # contradicts
+        result = LossZoneDetector().detect(d, _prescribe([[-0.5]]))
+        assert result.zones[0].confidence == "medium"
 
     def test_custom_current_threshold_respected(self):
         # current=0.2 — below default 0.3 but above custom 0.15 → should detect
