@@ -7,6 +7,7 @@ from groundshift.api.routes.emerging import make_emerging_router
 from groundshift.api.routes.packages import make_packages_router
 from groundshift.api.routes.regions import make_regions_router
 from groundshift.api.routes.runs import make_runs_router
+from groundshift.api.routes.transitions import make_transitions_router
 from groundshift.regions.resolver import _REGISTRY
 
 _PROFILES_DIR = Path(__file__).parents[2] / "crop_profiles"
@@ -29,6 +30,7 @@ def create_app(
     app.include_router(make_emerging_router(results_dir), prefix="/api/v1")
     app.include_router(make_runs_router(results_dir), prefix="/api/v1")
     app.include_router(make_packages_router(mbtiles_dir), prefix="/api/v1")
+    app.include_router(make_transitions_router(profiles_dir), prefix="/api/v1")
     return app
 
 
