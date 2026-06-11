@@ -125,7 +125,8 @@ groundshift/
 │   │       ├── regions.py               # ✓ GET /api/v1/regions, GET /api/v1/regions/{id}
 │   │       ├── emerging.py              # ✓ GET /api/v1/crops/{id}/emerging — serves pre-computed JSON results
 │   │       ├── runs.py                  # ✓ GET /api/v1/runs — lists results, filterable by crop_id / region_id
-│   │       └── packages.py              # GET /api/v1/packages/{crop}/{region} — planned
+│   │       └── packages.py              # ✓ GET /api/v1/packages, GET /api/v1/packages/{crop}/{region} — streams MBTiles
+│   │       └── transitions.py           # ✓ GET /api/v1/crops/{id}/transitions — Jaccard envelope ranking
 │   │
 │   ├── plugins/
 │   │   ├── base.py                      # ✓ GroundshiftPlugin ABC (5-method contract)
@@ -216,6 +217,7 @@ groundshift/
 │   ├── __init__.py
 │   ├── export_emerging.py               # ✓ runs prescribe pipeline, writes emerging zone JSON for API
 │   ├── export_mbtiles.py                # ✓ converts zone mask (xr.DataArray) to MBTiles for CivTAK offline
+│   ├── export_kmz.py                   # ✓ converts zone mask to KMZ (ZIP/KML) for CivTAK polygon overlays
 │   └── ingest/                          # One-time and scheduled ingestion
 │       ├── __init__.py
 │       ├── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
@@ -497,8 +499,10 @@ The REST API is the delivery boundary between pipeline artifacts and all clients
 | `GET /api/v1/regions/{id}` | ✓ Live | Single region detail |
 | `GET /api/v1/crops/{id}/emerging` | ✓ Live | Pre-computed opportunity zone results; `?region=` filter supported |
 | `GET /api/v1/runs` | ✓ Live | List computed results; `?crop_id=` and `?region_id=` filters supported |
+| `GET /api/v1/packages` | ✓ Live | List available MBTiles packages; `?crop_id=` and `?region_id=` filters |
+| `GET /api/v1/packages/{crop_id}/{region_id}` | ✓ Live | Download pre-generated MBTiles as `application/octet-stream` |
+| `GET /api/v1/crops/{id}/transitions` | ✓ Live | Ranked alternative crop suggestions by Jaccard envelope overlap |
 | `GET /api/v1/runs/{run_id}/surfaces` | Planned | Suitability surfaces for a completed run |
-| `GET /api/v1/packages/{crop_id}/{region_id}` | Planned | Download pre-generated offline package |
 
 **Emerging zone result storage:** Pre-computed results are written to `data/results/emerging/{crop_id}_{region_id}.json` by `scripts/export_emerging.py`. The `GET /api/v1/crops/{id}/emerging` endpoint reads those files at request time — no pipeline runs on request. Run the export script after any prescribe pipeline update to keep the API current:
 
@@ -910,6 +914,6 @@ GROUNDSHIFT_API_PORT=8000
 | Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source + LandsatSource, DescribePhaseRunner, calibration anchor monitoring, NDVI divergence surface, Landsat historical trend surface, CLI `groundshift run --phase describe --source --imagery`. | ✓ Functional |
 | Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. | ✓ Functional |
 | Phase 3 — Prescribe | Delta surfaces, opportunity zone detection, loss zone detection, and transition recommendations complete. `PrescribePhaseRunner` + `GainZoneDetector` + `LossZoneDetector` + `TransitionRecommender`; CLI prints gaining/losing cells, opportunity zone counts, loss zone counts, and ranked transition suggestions per scenario+horizon. Cooperative infrastructure context is next. | ✓ Mostly functional |
-| API + delivery | `GET /api/v1/crops`, `GET /api/v1/crops/{id}`, `GET /api/v1/regions`, `GET /api/v1/regions/{id}`, `GET /api/v1/crops/{id}/emerging`, `GET /api/v1/runs` all live. `scripts/export_mbtiles.py` delivers MBTiles for CivTAK offline use. Packages endpoint and KMZ export planned. | ✓ Mostly functional |
+| API + delivery | All core endpoints live: crops, regions, emerging, runs, packages (MBTiles download), transitions. Both offline formats complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). | ✓ Functional |
 | Plugin expansion | Frost risk, pest/disease, phenology plugins | Planned |
 | Additional crops | Wine grape, olive, wheat profiles production-ready | Planned |
