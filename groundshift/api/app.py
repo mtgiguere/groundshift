@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from groundshift.api.routes.crops import make_crops_router
 from groundshift.api.routes.emerging import make_emerging_router
 from groundshift.api.routes.regions import make_regions_router
+from groundshift.api.routes.runs import make_runs_router
 from groundshift.regions.resolver import _REGISTRY
 
 _PROFILES_DIR = Path(__file__).parents[2] / "crop_profiles"
@@ -23,6 +24,7 @@ def create_app(
     app.include_router(make_crops_router(profiles_dir), prefix="/api/v1")
     app.include_router(make_regions_router(_REGISTRY), prefix="/api/v1")
     app.include_router(make_emerging_router(results_dir), prefix="/api/v1")
+    app.include_router(make_runs_router(results_dir), prefix="/api/v1")
     return app
 
 
