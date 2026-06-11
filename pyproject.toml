@@ -16,6 +16,8 @@ ingest = [
     "cdsapi>=0.7",
     "pystac-client>=0.7",
     "stackstac>=0.5",
+    "gcsfs>=2024.2",
+    "intake-esm>=2023.11",
 ]
 dev = [
     "pytest>=8.0",
