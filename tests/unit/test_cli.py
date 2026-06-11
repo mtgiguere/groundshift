@@ -31,8 +31,15 @@ def test_run_missing_phase_exits_with_error():
         parser.parse_args(["run", "--crop", "coffee", "--region", "ethiopia"])
 
 
+def test_predict_phase_is_accepted():
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        ["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "predict"]
+    )
+    assert args.phase == "predict"
+
+
 def test_run_invalid_phase_exits_with_error():
-    # Only 'describe' is implemented; other phases are not valid yet.
     parser = build_arg_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "invalid"])
