@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Audit dependencies
-        run: pip-audit
+        run: pip-audit --skip-editable
 
   test:
     name: Tests
