@@ -11,6 +11,7 @@ from groundshift.core.envelope.cmip6_source import CMIP6Source
 from groundshift.core.envelope.era5_source import ERA5Source
 from groundshift.core.envelope.worldclim_source import WorldClimSource
 from groundshift.core.envelope.yaml_loader import load_profile_from_yaml
+from groundshift.core.imagery.landsat_source import LandsatSource
 from groundshift.core.imagery.sentinel2_source import Sentinel2Source
 from groundshift.core.opportunity.gain_zone_detector import GainZoneDetector
 from groundshift.core.phases.describe import DescribePhaseRunner
@@ -23,6 +24,7 @@ from groundshift.regions.resolver import UnknownRegionError, resolve_region
 _WORLDCLIM_DIR = Path(__file__).parents[1] / "data" / "worldclim" / "10m"
 _ERA5_DIR = Path(__file__).parents[1] / "data" / "era5"
 _SENTINEL2_DIR = Path(__file__).parents[1] / "data" / "sentinel2"
+_LANDSAT_DIR = Path(__file__).parents[1] / "data" / "landsat"
 _CMIP6_DIR = Path(__file__).parents[1] / "data" / "cmip6"
 
 _WORLDCLIM_TIME_RANGE = TimeRange(start=datetime(1970, 1, 1), end=datetime(2000, 12, 31))
@@ -58,8 +60,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--imagery",
         default=None,
-        choices=["sentinel2"],
-        help="Imagery source for observed vegetation divergence (optional).",
+        choices=["sentinel2", "landsat"],
+        help="Imagery source: sentinel2 for NDVI divergence, landsat for historical trend.",
     )
     return parser
 
@@ -85,9 +87,14 @@ def run_describe(args: argparse.Namespace) -> None:
         source = WorldClimSource(_WORLDCLIM_DIR)
         time_range = _WORLDCLIM_TIME_RANGE
     imagery_source = None
+    landsat_source = None
     if args.imagery == "sentinel2":
         imagery_source = Sentinel2Source(_SENTINEL2_DIR)
-    runner = DescribePhaseRunner(source, PluginRegistry(), imagery_source=imagery_source)
+    elif args.imagery == "landsat":
+        landsat_source = LandsatSource(_LANDSAT_DIR)
+    runner = DescribePhaseRunner(
+        source, PluginRegistry(), imagery_source=imagery_source, landsat_source=landsat_source
+    )
     result = runner.run(profile, region, time_range)
 
     score = result.suitability.score.values
@@ -108,6 +115,19 @@ def run_describe(args: argparse.Namespace) -> None:
                 f"  divergence (climate − observed):  "
                 f"min={finite_div.min():.3f}  mean={finite_div.mean():.3f}  "
                 f"max={finite_div.max():.3f}"
+            )
+
+    if result.trend is not None:
+        slope = result.trend.slope.values
+        finite_slope = slope[~np.isnan(slope)]
+        if len(finite_slope) > 0:
+            declining = int((finite_slope < 0).sum())
+            improving = int((finite_slope > 0).sum())
+            sign = "+" if finite_slope.mean() >= 0 else ""
+            print(
+                f"  trend (NDVI/year):  "
+                f"mean={sign}{finite_slope.mean():.4f}  "
+                f"declining={declining}  improving={improving} cells"
             )
 
     anchors = load_anchors_from_profile(profile)

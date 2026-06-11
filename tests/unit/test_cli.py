@@ -185,6 +185,24 @@ def test_imagery_sentinel2_is_accepted():
     assert args.imagery == "sentinel2"
 
 
+def test_imagery_landsat_is_accepted():
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "run",
+            "--crop",
+            "coffee",
+            "--region",
+            "ethiopia",
+            "--phase",
+            "describe",
+            "--imagery",
+            "landsat",
+        ]
+    )
+    assert args.imagery == "landsat"
+
+
 def test_imagery_invalid_exits_with_error():
     parser = build_arg_parser()
     with pytest.raises(SystemExit):
@@ -265,6 +283,17 @@ class TestRunDescribe:
             with patch("groundshift.cli.load_anchors_from_profile", return_value=[]):
                 run_describe(self._args(source="era5"))
         assert "Describe phase" in capsys.readouterr().out
+
+    def test_landsat_imagery_prints_trend_line(self, capsys):
+        result = _fake_describe_result()
+        slope = xr.DataArray(np.array([[-0.002, 0.001], [0.003, -0.001]]))
+        from groundshift.models.trend_result import TrendResult
+
+        result.trend = TrendResult(slope=slope)
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=result):
+            with patch("groundshift.cli.load_anchors_from_profile", return_value=[]):
+                run_describe(self._args(imagery="landsat"))
+        assert "trend" in capsys.readouterr().out.lower()
 
 
 # ---------------------------------------------------------------------------

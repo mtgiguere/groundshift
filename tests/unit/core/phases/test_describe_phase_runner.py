@@ -4,9 +4,11 @@ import numpy as np
 import xarray as xr
 
 from groundshift.core.envelope.climate_source import ClimateDataSource
+from groundshift.core.imagery.imagery_source import ImagerySource
 from groundshift.models.bounding_box import BoundingBox
 from groundshift.models.describe_result import DescribeResult
 from groundshift.models.time_range import TimeRange
+from groundshift.models.trend_result import TrendResult
 from groundshift.plugins.registry import PluginRegistry
 
 REGION = BoundingBox(min_lon=35.0, min_lat=3.0, max_lon=42.0, max_lat=15.0)
@@ -41,10 +43,22 @@ class _ConstantSource(ClimateDataSource):
         return xr.DataArray(np.full((4, 4), self._values[variable]))
 
 
-def _make_runner(source: ClimateDataSource, registry: PluginRegistry | None = None):
+class _ConstantImagerySource(ImagerySource):
+    def __init__(self, value: float) -> None:
+        self._value = value
+
+    def fetch(self, variable: str, region: BoundingBox, time_range: TimeRange) -> xr.DataArray:
+        return xr.DataArray(np.full((4, 4), self._value))
+
+
+def _make_runner(
+    source: ClimateDataSource,
+    registry: PluginRegistry | None = None,
+    landsat_source: ImagerySource | None = None,
+):
     from groundshift.core.phases.describe import DescribePhaseRunner
 
-    return DescribePhaseRunner(source, registry or PluginRegistry())
+    return DescribePhaseRunner(source, registry or PluginRegistry(), landsat_source=landsat_source)
 
 
 def test_describe_phase_runner_returns_describe_result():
@@ -140,3 +154,36 @@ def test_describe_phase_runner_passes_envelope_as_gate_to_scorer():
     import pytest
 
     assert float(result.suitability.score.mean()) == pytest.approx(0.0)
+
+
+def test_trend_is_none_when_no_landsat_source():
+    source = _ConstantSource({"mean_annual_temp_c": 21.0, "annual_precipitation_mm": 2000.0})
+    runner = _make_runner(source)
+    result = runner.run(_PROFILE, REGION, TIME_RANGE)
+    assert result.trend is None
+
+
+def test_trend_is_trend_result_when_landsat_source_provided():
+    source = _ConstantSource({"mean_annual_temp_c": 21.0, "annual_precipitation_mm": 2000.0})
+    landsat = _ConstantImagerySource(-0.003)
+    runner = _make_runner(source, landsat_source=landsat)
+    result = runner.run(_PROFILE, REGION, TIME_RANGE)
+    assert isinstance(result.trend, TrendResult)
+
+
+def test_trend_slope_is_dataarray():
+    source = _ConstantSource({"mean_annual_temp_c": 21.0, "annual_precipitation_mm": 2000.0})
+    landsat = _ConstantImagerySource(-0.003)
+    runner = _make_runner(source, landsat_source=landsat)
+    result = runner.run(_PROFILE, REGION, TIME_RANGE)
+    assert isinstance(result.trend.slope, xr.DataArray)
+
+
+def test_trend_slope_values_match_landsat_fetch():
+    import pytest
+
+    source = _ConstantSource({"mean_annual_temp_c": 21.0, "annual_precipitation_mm": 2000.0})
+    landsat = _ConstantImagerySource(-0.003)
+    runner = _make_runner(source, landsat_source=landsat)
+    result = runner.run(_PROFILE, REGION, TIME_RANGE)
+    assert float(result.trend.slope.mean()) == pytest.approx(-0.003)
