@@ -10,6 +10,7 @@ from groundshift.core.calibration.anchor_scorer import score_anchors
 from groundshift.core.envelope.era5_source import ERA5Source
 from groundshift.core.envelope.worldclim_source import WorldClimSource
 from groundshift.core.envelope.yaml_loader import load_profile_from_yaml
+from groundshift.core.imagery.sentinel2_source import Sentinel2Source
 from groundshift.core.phases.describe import DescribePhaseRunner
 from groundshift.models.time_range import TimeRange
 from groundshift.plugins.registry import PluginRegistry
@@ -17,6 +18,7 @@ from groundshift.regions.resolver import UnknownRegionError, resolve_region
 
 _WORLDCLIM_DIR = Path(__file__).parents[1] / "data" / "worldclim" / "10m"
 _ERA5_DIR = Path(__file__).parents[1] / "data" / "era5"
+_SENTINEL2_DIR = Path(__file__).parents[1] / "data" / "sentinel2"
 
 _WORLDCLIM_TIME_RANGE = TimeRange(start=datetime(1970, 1, 1), end=datetime(2000, 12, 31))
 _ERA5_TIME_RANGE = TimeRange(start=datetime(2015, 1, 1), end=datetime(2024, 12, 31))
@@ -44,6 +46,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=["worldclim", "era5"],
         help="Climate data source (default: worldclim).",
     )
+    run.add_argument(
+        "--imagery",
+        default=None,
+        choices=["sentinel2"],
+        help="Imagery source for observed vegetation divergence (optional).",
+    )
     return parser
 
 
@@ -67,7 +75,10 @@ def run_describe(args: argparse.Namespace) -> None:
     else:
         source = WorldClimSource(_WORLDCLIM_DIR)
         time_range = _WORLDCLIM_TIME_RANGE
-    runner = DescribePhaseRunner(source, PluginRegistry())
+    imagery_source = None
+    if getattr(args, "imagery", None) == "sentinel2":
+        imagery_source = Sentinel2Source(_SENTINEL2_DIR)
+    runner = DescribePhaseRunner(source, PluginRegistry(), imagery_source=imagery_source)
     result = runner.run(profile, region, time_range)
 
     score = result.suitability.score.values
