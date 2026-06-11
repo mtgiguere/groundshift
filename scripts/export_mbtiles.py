@@ -65,7 +65,7 @@ def _mask_to_rgba(
     lon_vals = mask[lon_name].values
     mask_arr = mask.values
 
-    if east < lat_vals.min() or west > lon_vals.max():
+    if east < lon_vals.min() or west > lon_vals.max():
         return canvas
     if north < lat_vals.min() or south > lat_vals.max():
         return canvas
