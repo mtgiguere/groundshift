@@ -43,11 +43,11 @@ Additional crop profiles (wine grape, olive, wheat, cocoa, tea) are included in 
 ## Key Capabilities
 
 - **Crop climate envelope modeling** — temperature, precipitation, altitude thresholds with trapezoid scoring (viable min/max, optimal min/max)
-- **Multiple climate data sources** — WorldClim v2.1 (1970–2000 baseline) and ERA5 reanalysis (2015–present) both implement the same `ClimateDataSource` interface; swap with a single argument
+- **Multiple climate data sources** — WorldClim v2.1 (1970–2000 baseline) and ERA5 reanalysis (2015–present) both implement the same `ClimateDataSource` interface; swap with `--source era5`
 - **Calibration anchor monitoring** — named reference zones (origin centers, production references, stress references) scored on every run; alerts fire when a documented high-suitability zone drops below threshold
+- **Satellite imagery divergence** — Sentinel-2 NDVI composites compared against the climate suitability score; the signed divergence surface shows where model and ground truth agree or disagree; add `--imagery sentinel2`
 - **CMIP6 suitability projection** — SSP2 and SSP5 scenarios, 2040 / 2060 / 2100 horizons (planned)
-- **Satellite imagery analysis** — Sentinel-2 NDVI/EVI crop health, Landsat historical change detection (planned)
-- **Ground truth vs. model divergence detection** — where observed signals lead or lag projections (planned)
+- **Landsat historical trend detection** — multi-decade NDVI change detection, onset date estimation (planned)
 - **Opportunity zone identification** — emerging suitability zones with infrastructure and market-access scoring (planned)
 - **Plugin architecture** — extensible evidence layers (pest/disease, frost risk, groundwater, land tenure) drop in without touching core logic
 - **Confidence visualization** — uncertainty surfaces alongside every suitability output
@@ -84,7 +84,7 @@ cd groundshift
 pip install -e ".[dev]"
 ```
 
-### Download climate data
+### Download climate and imagery data
 
 ```bash
 # WorldClim v2.1 — 1970–2000 climatological baseline (~300MB)
@@ -92,8 +92,11 @@ python scripts/ingest/download_worldclim.py
 
 # ERA5 reanalysis — 2015–2024 recent observed climate (requires CDS API key)
 # See https://cds.climate.copernicus.eu/how-to-api to set up ~/.cdsapirc
-pip install -e ".[ingest]"   # installs cdsapi
+pip install -e ".[ingest]"   # installs cdsapi, pystac-client, stackstac
 python scripts/ingest/download_era5.py
+
+# Sentinel-2 NDVI composite — free, no account required (uses AWS Earth Search)
+python scripts/ingest/download_sentinel2.py --region ethiopia --year 2023
 ```
 
 ### Run your first analysis
@@ -113,6 +116,15 @@ groundshift run --crop coffee --region ethiopia --phase describe
 #     [origin_center] Yirgacheffe / Sidama: 0.812  (expected >= 0.70)
 #     [production_reference] Colombia Huila: n/a (outside region)  (expected >= 0.60)
 #     [stress_reference] Central America Pacific Coast: n/a (outside region)  (stress reference — no floor)
+
+# Add Sentinel-2 imagery divergence (requires sentinel2_ndvi.tif in data/sentinel2/)
+groundshift run --crop coffee --region ethiopia --phase describe --imagery sentinel2
+
+# Additional output line:
+#   divergence (climate − observed):  min=-0.412  mean=0.118  max=0.631
+
+# Use ERA5 reanalysis instead of WorldClim baseline
+groundshift run --crop coffee --region ethiopia --phase describe --source era5
 ```
 
 ### Run tests
@@ -182,7 +194,7 @@ See [TDD_CONTRACT.md](TDD_CONTRACT.md) for the evidence base behind this discipl
 | Recent observed climate (2015–present) | ERA5 (Copernicus/ECMWF) | Copernicus licence | ✓ Integrated |
 | Climate projections | CMIP6 (ESGF) | CC BY 4.0 | Planned |
 | Crop suitability baselines | FAO GAEZ v4 | CC BY-NC 4.0 | Planned |
-| Satellite imagery | Sentinel-2 (ESA/AWS) | CC BY 4.0 | Planned |
+| Satellite imagery | Sentinel-2 (AWS Earth Search) | CC BY 4.0 | ✓ Integrated |
 | Historical imagery | Landsat (USGS/AWS) | Public domain | Planned |
 | Soil properties | SoilGrids 250m (ISRIC) | CC BY 4.0 | Planned |
 | Surface water | JRC Global Surface Water | CC BY 4.0 | Planned |
@@ -208,13 +220,15 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe phase climate envelope pipeline is complete and runnable end-to-end from the CLI. The imagery analysis layer (Sentinel-2 NDVI, Landsat trend detection) is next.
+Active development. The Describe phase is complete and runnable end-to-end — climate envelope scoring, calibration anchor monitoring, and Sentinel-2 imagery divergence are all wired into the CLI. The Predict phase (CMIP6 projections) is next.
 
 | Component | Status |
 |---|---|
 | Core models (BoundingBox, TimeRange, LayerData, PluginMetadata) | ✓ Complete |
 | SuitabilityModifier (factor_value, probability, confidence as DataArrays) | ✓ Complete |
 | SuitabilityResult (score, confidence as DataArrays) | ✓ Complete |
+| DescribeResult (suitability + divergence) | ✓ Complete |
+| DivergenceResult (climate vs. observed NDVI surface) | ✓ Complete |
 | Plugin base class (GroundshiftPlugin ABC) | ✓ Complete |
 | Plugin registry | ✓ Complete |
 | Three-tier aggregator (existential / stress / custom, envelope as hard gate) | ✓ Complete |
@@ -225,14 +239,18 @@ Active development. The Describe phase climate envelope pipeline is complete and
 | compute_envelope (envelope pipeline step) | ✓ Complete |
 | WorldClimSource (1970–2000 baseline) | ✓ Complete |
 | ERA5Source (2015–present reanalysis) | ✓ Complete |
+| ImagerySource ABC | ✓ Complete |
+| Sentinel2Source (NDVI from pre-computed GeoTIFF) | ✓ Complete |
+| compute_divergence (climate score − normalized NDVI) | ✓ Complete |
 | Calibration anchor model + loader + scorer | ✓ Complete |
 | Regions resolver (Ethiopia, Colombia, Central America) | ✓ Complete |
-| DescribePhaseRunner (end-to-end Describe orchestration) | ✓ Complete |
-| CLI (`groundshift run --crop --region --phase`) | ✓ Complete |
+| DescribePhaseRunner (climate + optional imagery, returns DescribeResult) | ✓ Complete |
+| CLI (`groundshift run --crop --region --phase --source --imagery`) | ✓ Complete |
 | Raster utility (geodataframe_to_modifier) | ✓ Complete |
 | WorldClim download script | ✓ Complete |
 | ERA5 download script | ✓ Complete |
-| Sentinel-2 / Landsat imagery pipeline | Planned |
+| Sentinel-2 download script (AWS Earth Search, free, no auth) | ✓ Complete |
+| Landsat historical trend detection | Planned |
 | CMIP6 projection pipeline | Planned |
 | Opportunity zone detector (Phase 3) | Planned |
 | REST API | Planned |
