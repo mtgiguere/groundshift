@@ -106,12 +106,12 @@ groundshift/
 │   │   │   ├── imagery_source.py        # ✓ ImagerySource ABC — fetch(variable, region, time_range) → DataArray
 │   │   │   ├── sentinel2_source.py      # ✓ Sentinel2Source — GeoTIFF-backed ImagerySource (NDVI)
 │   │   │   ├── divergence.py            # ✓ compute_divergence(SuitabilityResult, ndvi) → DivergenceResult
-│   │   │   ├── landsat_archive.py       # Landsat historical access — planned
+│   │   │   ├── landsat_source.py        # ✓ LandsatSource — pre-computed OLS trend GeoTIFF (NDVI/year)
 │   │   │   └── change_detector.py       # Multi-temporal change detection — planned
 │   │   ├── opportunity/
-│   │   │   ├── emergence_detector.py    # Phase 3 — planned
-│   │   │   ├── gain_zone_detector.py    # Phase 3 — planned
+│   │   │   ├── gain_zone_detector.py    # ✓ GainZoneDetector — low current suitability + positive delta → mask
 │   │   │   ├── loss_zone_detector.py    # Phase 3 — planned
+│   │   │   ├── emergence_detector.py    # Phase 3 — planned (multi-signal confidence tiers)
 │   │   │   └── transition_recommender.py # Phase 3 — planned
 │   │   ├── aggregator.py                # ✓ three-tier aggregation (existential/stress/custom), envelope gate
 │   │   ├── scorer.py                    # ✓ runs registry plugins against envelope, returns SuitabilityResult
@@ -119,13 +119,13 @@ groundshift/
 │   │       └── raster.py                # ✓ geodataframe_to_modifier — rasterize GeoDataFrame to SuitabilityModifier
 │   │
 │   ├── api/
-│   │   ├── app.py                       # FastAPI application entry point
+│   │   ├── app.py                       # ✓ create_app(profiles_dir) — FastAPI factory, testable
 │   │   └── routes/
-│   │       ├── crops.py                 # GET /crops, GET /crops/{id}
-│   │       ├── regions.py               # GET /regions
-│   │       ├── runs.py                  # GET /runs, GET /runs/{id}/surfaces
-│   │       ├── emerging.py              # GET /crops/{id}/emerging
-│   │       └── packages.py              # GET /packages/{crop}/{region}
+│   │       ├── crops.py                 # ✓ GET /api/v1/crops, GET /api/v1/crops/{id}
+│   │       ├── regions.py               # GET /api/v1/regions — planned
+│   │       ├── runs.py                  # GET /api/v1/runs, GET /api/v1/runs/{id}/surfaces — planned
+│   │       ├── emerging.py              # GET /api/v1/crops/{id}/emerging — planned
+│   │       └── packages.py              # GET /api/v1/packages/{crop}/{region} — planned
 │   │
 │   ├── plugins/
 │   │   ├── base.py                      # ✓ GroundshiftPlugin ABC (5-method contract)
@@ -145,9 +145,11 @@ groundshift/
 │   │   ├── suitability_modifier.py      # ✓ factor_value/probability/confidence as DataArrays
 │   │   ├── suitability_result.py        # ✓ score/confidence as DataArrays
 │   │   ├── divergence_result.py         # ✓ DivergenceResult — signed climate-vs-observed surface
-│   │   ├── describe_result.py           # ✓ DescribeResult — suitability + optional divergence
+│   │   ├── describe_result.py           # ✓ DescribeResult — suitability + optional divergence + optional trend
 │   │   ├── predict_result.py            # ✓ PredictResult / PredictProjection — suitability per scenario+horizon
 │   │   ├── prescribe_result.py          # ✓ PrescribeResult / ChangeProjection — delta surface per scenario+horizon
+│   │   ├── opportunity_zone.py          # ✓ OpportunityZone / OpportunityZoneResult — gain-zone mask per scenario+horizon
+│   │   ├── trend_result.py              # ✓ TrendResult — per-pixel NDVI/year slope DataArray
 │   │   ├── time_range.py                # ✓ start/end with scenario and horizon support
 │   │   ├── calibration_anchor.py        # ✓ CalibrationAnchor — role-validated reference zone
 │   │   └── anchor_score.py              # ✓ AnchorScore — per-run score + alert result
@@ -181,16 +183,18 @@ groundshift/
 │   │   ├── core/
 │   │   │   ├── envelope/                # ✓ test_threshold, test_envelope_scorer, test_profile_loader, test_climate_envelope, test_worldclim_source
 │   │   │   ├── phases/                  # ✓ test_describe_phase_runner, test_predict_phase_runner, test_prescribe_phase_runner
+│   │   │   ├── opportunity/             # ✓ test_gain_zone_detector
 │   │   │   ├── utils/                   # ✓ test_raster
 │   │   │   ├── test_aggregator.py       # ✓ three-tier logic, probability/expected value, property tests
 │   │   │   └── test_scorer.py           # ✓
 │   │   ├── models/                      # ✓ all models covered
 │   │   ├── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   │   ├── regions/                     # ✓ test_resolver.py
-│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5, test_download_sentinel2, test_download_cmip6
+│   │   ├── api/                         # ✓ test_crops (status codes, response shape, 404, threshold structure)
+│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5, test_download_sentinel2, test_download_cmip6, test_download_landsat
 │   │   └── test_cli.py                  # ✓ argument parsing, run_describe, run_predict, run_prescribe, --source, --imagery
 │   ├── integration/
-│   │   └── test_describe_phase_smoke.py # ✓ full pipeline + CLI + anchor + ERA5/Sentinel-2 skip tests
+│   │   └── test_describe_phase_smoke.py # ✓ WorldClim + ERA5 + Sentinel-2 + Landsat smoke tests (skip if data absent)
 │   └── fixtures/                        # synthetic datasets — not yet written
 │
 ├── docs/
@@ -203,6 +207,7 @@ groundshift/
 │   ├── worldclim/10m/                   # WorldClim GeoTIFFs (downloaded by ingest script, gitignored)
 │   ├── era5/                            # ERA5 NetCDF files (downloaded by ingest script, gitignored)
 │   ├── sentinel2/                       # Sentinel-2 NDVI GeoTIFFs (downloaded by ingest script, gitignored)
+│   ├── landsat/                         # Landsat NDVI trend GeoTIFFs (downloaded by ingest script, gitignored)
 │   └── cmip6/                           # CMIP6 projection NetCDFs (downloaded by ingest script, gitignored)
 │
 ├── scripts/
@@ -212,7 +217,8 @@ groundshift/
 │       ├── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
 │       ├── download_era5.py             # ✓ downloads ERA5 reanalysis to data/era5/ (requires cdsapi)
 │       ├── download_sentinel2.py        # ✓ downloads Sentinel-2 NDVI composite via AWS Earth Search (free)
-│       └── download_cmip6.py            # ✓ downloads CMIP6 projections via Pangeo/Google Cloud (free)
+│       ├── download_cmip6.py            # ✓ downloads CMIP6 projections via Pangeo/Google Cloud (free)
+│       └── download_landsat.py          # ✓ downloads Landsat C2 L2 via AWS Earth Search, computes OLS trend (free)
 │
 ├── infrastructure/
 │   └── aws/                             # Lambda, S3, RDS terraform/CDK
@@ -241,10 +247,10 @@ Each analysis run executes one or more phases in sequence. Phases share a common
 
 **Outputs:**
 - Current suitability surface with confidence
-- NDVI/EVI crop health surface (recent)
-- Historical NDVI trend (slope over archive period)
-- Model vs. observed divergence surface — where do projections and imagery disagree?
-- Stress signal onset dates — when did decline begin in already-stressed zones?
+- NDVI divergence surface — where do projections and satellite imagery disagree? (`--imagery sentinel2`)
+- Historical NDVI trend slope — per-pixel OLS over full Landsat archive, 1985–present (`--imagery landsat`)
+- Stress signal onset dates — when did decline begin in already-stressed zones? (planned)
+- Calibration anchor scores with alerts for below-threshold origin and production zones
 
 **Key design note:** The divergence surface is the most scientifically valuable Describe output. Where imagery shows decline years before models predict it, farmers are already adapting. Where imagery shows expansion into zones models say are unsuitable, local microclimates or variety adaptation may explain the gap. Both are important signals.
 
@@ -270,7 +276,12 @@ Each analysis run executes one or more phases in sequence. Phases share a common
 
 **Question:** What should stakeholders do?
 
-**Implemented:** `PrescribePhaseRunner` computes signed per-cell delta surfaces (projected suitability − current suitability) for each scenario+horizon combination using `DescribeResult` and `PredictResult`. Positive delta cells are gaining viability; negative are losing. Opportunity zone detection, transition recommendations, and infrastructure context are next.
+**Implemented:**
+- `PrescribePhaseRunner` computes signed per-cell delta surfaces (projected − current suitability) for each scenario+horizon combination using `DescribeResult` and `PredictResult`.
+- `GainZoneDetector` scans those delta surfaces for opportunity zones — cells currently below a suitability threshold but gaining meaningfully. Outputs one boolean mask per scenario+horizon with a confidence tier (currently `"low"` — single CMIP6 signal; medium/high tiers require Landsat trend and plugin agreement).
+- Both are wired into `run_prescribe`; opportunity zone cell counts appear in CLI output.
+
+Loss zone detection, transition recommendations, and infrastructure context are next.
 
 **Inputs:**
 - Phase 1 and Phase 2 outputs (DescribeResult + PredictResult)
@@ -662,8 +673,8 @@ Implementations:
 
 | Implementation | Data | Variable | Status |
 |---|---|---|---|
-| `Sentinel2Source` | Pre-computed NDVI GeoTIFF | `"ndvi"` | ✓ Complete |
-| `LandsatSource` | Historical archive | `"ndvi_trend"` | Planned |
+| `Sentinel2Source` | Pre-computed NDVI composite GeoTIFF | `"ndvi"` | ✓ Complete |
+| `LandsatSource` | Pre-computed OLS trend slope GeoTIFF (1985–present) | `"ndvi_trend"` | ✓ Complete |
 
 ### Divergence
 
@@ -881,9 +892,9 @@ GROUNDSHIFT_API_PORT=8000
 
 | Phase | Scope | Status |
 |---|---|---|
-| Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source, DescribePhaseRunner, calibration anchor monitoring, imagery divergence surface, CLI `groundshift run --phase describe --source --imagery`. Landsat historical trend detection is next. | ✓ Functional |
-| Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. Scenario comparison surface and confidence surfaces are next. | ✓ Functional |
-| Phase 3 — Prescribe | Core delta surfaces complete. `PrescribePhaseRunner` computes signed per-cell change (projected − current) per scenario+horizon; CLI `groundshift run --phase prescribe`. Opportunity zone detection, transition recommender, and cooperative infrastructure layer are next. | ✓ Partially functional |
-| API + delivery | REST API, web app, mobile app, offline package generation | Planned |
+| Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source + LandsatSource, DescribePhaseRunner, calibration anchor monitoring, NDVI divergence surface, Landsat historical trend surface, CLI `groundshift run --phase describe --source --imagery`. | ✓ Functional |
+| Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. | ✓ Functional |
+| Phase 3 — Prescribe | Delta surfaces and opportunity zone detection complete. `PrescribePhaseRunner` + `GainZoneDetector`; CLI `groundshift run --phase prescribe` prints gaining/losing cells and opportunity zone counts per scenario+horizon. Loss zone detection, transition recommender, and cooperative infrastructure layer are next. | ✓ Partially functional |
+| API + delivery | Skeleton live. `GET /api/v1/crops` and `GET /api/v1/crops/{id}` complete. Regions, runs, emerging, and packages endpoints planned. Web app, mobile, offline generation planned. | ✓ Partially functional |
 | Plugin expansion | Frost risk, pest/disease, phenology plugins | Planned |
 | Additional crops | Wine grape, olive, wheat profiles production-ready | Planned |

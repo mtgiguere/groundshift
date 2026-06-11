@@ -48,8 +48,10 @@ Additional crop profiles (wine grape, olive, wheat, cocoa, tea) are included in 
 - **Satellite imagery divergence** — Sentinel-2 NDVI composites compared against the climate suitability score; the signed divergence surface shows where model and ground truth agree or disagree; add `--imagery sentinel2`
 - **CMIP6 suitability projection** — SSP2 and SSP5 scenarios, 2040 / 2060 / 2100 horizons; run with `--phase predict`
 - **Climate change delta surfaces** — signed per-cell suitability change (projected − current) per scenario and horizon; run with `--phase prescribe`
-- **Landsat historical trend detection** — multi-decade NDVI change detection, onset date estimation (planned)
-- **Opportunity zone identification** — emerging suitability zones with infrastructure and market-access scoring (planned)
+- **Opportunity zone detection** — cells currently low-suitability but meaningfully gaining; appended to every Prescribe run
+- **Landsat historical NDVI trend** — per-pixel OLS slope over the full Landsat archive (1985–present); add `--imagery landsat`
+- **REST API** — FastAPI service exposing crop profiles; `GET /api/v1/crops`, `GET /api/v1/crops/{id}` live; more endpoints in progress
+- **Opportunity zone identification with infrastructure context** — scoring against cooperative and market access layers (planned)
 - **Plugin architecture** — extensible evidence layers (pest/disease, frost risk, groundwater, land tenure) drop in without touching core logic
 - **Confidence visualization** — uncertainty surfaces alongside every suitability output
 
@@ -101,6 +103,10 @@ python scripts/ingest/download_sentinel2.py --region ethiopia --year 2023
 
 # CMIP6 climate projections — free, no account required (uses Pangeo/Google Cloud)
 python scripts/ingest/download_cmip6.py
+
+# Landsat Collection 2 NDVI trend surface — free, no account required (uses AWS Earth Search)
+# Computes per-pixel OLS slope over the full archive (1985–present)
+python scripts/ingest/download_landsat.py --region ethiopia
 ```
 
 ### Run your first analysis
@@ -126,6 +132,12 @@ groundshift run --crop coffee --region ethiopia --phase describe --imagery senti
 
 # Additional output line:
 #   divergence (climate − observed):  min=-0.412  mean=0.118  max=0.631
+
+# Add Landsat historical NDVI trend (requires landsat_ndvi_trend_ethiopia.tif in data/landsat/)
+groundshift run --crop coffee --region ethiopia --phase describe --imagery landsat
+
+# Additional output line:
+#   trend (NDVI/year):  mean=-0.0021  declining=412  improving=243 cells
 
 # Use ERA5 reanalysis instead of WorldClim baseline
 groundshift run --crop coffee --region ethiopia --phase describe --source era5
@@ -161,6 +173,14 @@ groundshift run --crop coffee --region ethiopia --phase prescribe
 #   [ssp585 / 2040]    gaining= 198  losing= 457  mean_delta=-0.034
 #   [ssp585 / 2060]    gaining= 131  losing= 524  mean_delta=-0.046
 #   [ssp585 / 2100]    gaining=  71  losing= 584  mean_delta=-0.062
+#
+#   opportunity zones (emerging — currently low suitability, meaningfully gaining):
+#   [ssp245 / 2040]      87 cells  confidence=low
+#   [ssp245 / 2060]      71 cells  confidence=low
+#   [ssp245 / 2100]      54 cells  confidence=low
+#   [ssp585 / 2040]      83 cells  confidence=low
+#   [ssp585 / 2060]      61 cells  confidence=low
+#   [ssp585 / 2100]      38 cells  confidence=low
 ```
 
 ### Run tests
@@ -231,7 +251,7 @@ See [TDD_CONTRACT.md](TDD_CONTRACT.md) for the evidence base behind this discipl
 | Climate projections | CMIP6 (Pangeo/Google Cloud) | CC BY 4.0 | ✓ Integrated |
 | Crop suitability baselines | FAO GAEZ v4 | CC BY-NC 4.0 | Planned |
 | Satellite imagery | Sentinel-2 (AWS Earth Search) | CC BY 4.0 | ✓ Integrated |
-| Historical imagery | Landsat (USGS/AWS) | Public domain | Planned |
+| Historical NDVI trend | Landsat Collection 2 (AWS Earth Search) | Public domain | ✓ Integrated |
 | Soil properties | SoilGrids 250m (ISRIC) | CC BY 4.0 | Planned |
 | Surface water | JRC Global Surface Water | CC BY 4.0 | Planned |
 | Smallholder farm locations | SPAM 2020 (IFPRI) | CC BY 4.0 | Planned |
@@ -256,7 +276,7 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, and Sentinel-2 imagery divergence. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces (projected − current suitability) per scenario and horizon, exposing gaining and losing zones. Opportunity zone detection and transition recommendations build on these delta surfaces and are next.
+Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces (projected − current suitability) and detects opportunity zones — cells currently low-suitability but meaningfully gaining. The REST API is live with crop profile endpoints. Loss zone detection, transition recommendations, and additional API endpoints are next.
 
 | Component | Status |
 |---|---|
@@ -269,6 +289,9 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | PredictResult (list of projections) | ✓ Complete |
 | ChangeProjection (scenario + horizon_year + delta DataArray) | ✓ Complete |
 | PrescribeResult (list of change projections) | ✓ Complete |
+| TrendResult (per-pixel NDVI/year slope DataArray) | ✓ Complete |
+| OpportunityZone (scenario + horizon_year + mask DataArray + confidence) | ✓ Complete |
+| OpportunityZoneResult (list of opportunity zones) | ✓ Complete |
 | Plugin base class (GroundshiftPlugin ABC) | ✓ Complete |
 | Plugin registry | ✓ Complete |
 | Three-tier aggregator (existential / stress / custom, envelope as hard gate) | ✓ Complete |
@@ -288,14 +311,18 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | CMIP6Source (scenario/horizon-aware ClimateDataSource) | ✓ Complete |
 | PredictPhaseRunner (SSP2/SSP5 × 2040/2060/2100, returns PredictResult) | ✓ Complete |
 | PrescribePhaseRunner (delta surfaces from DescribeResult + PredictResult) | ✓ Complete |
+| GainZoneDetector (emerging cells: low current suitability + positive delta) | ✓ Complete |
+| LandsatSource (file-backed ImagerySource, OLS trend slope GeoTIFF) | ✓ Complete |
 | CLI (`groundshift run --crop --region --phase --source --imagery`) | ✓ Complete |
 | Raster utility (geodataframe_to_modifier) | ✓ Complete |
 | WorldClim download script | ✓ Complete |
 | ERA5 download script | ✓ Complete |
 | Sentinel-2 download script (AWS Earth Search, free, no auth) | ✓ Complete |
 | CMIP6 download script (Pangeo/Google Cloud, free, no auth) | ✓ Complete |
-| Landsat historical trend detection | Planned |
-| Opportunity zone detector (Phase 3) | Planned |
-| REST API | Planned |
+| Landsat download script (AWS Earth Search, free, no auth; OLS trend) | ✓ Complete |
+| REST API — GET /api/v1/crops, GET /api/v1/crops/{id} | ✓ Complete |
+| Loss zone detector (high current suitability + significantly negative delta) | Planned |
+| Transition recommender (cross-profile climate envelope comparison) | Planned |
+| REST API — regions, runs, emerging, packages endpoints | Planned |
 
 *Built with the belief that information equity is a precondition for climate adaptation justice.*
