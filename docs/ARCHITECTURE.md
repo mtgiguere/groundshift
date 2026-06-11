@@ -96,10 +96,11 @@ groundshift/
 │   │   │   ├── climate_envelope.py      # ✓ compute_envelope(profile, source, region, time_range) → DataArray
 │   │   │   ├── worldclim_source.py      # ✓ WorldClimSource — file-backed ClimateDataSource, 1970-2000 baseline
 │   │   │   ├── era5_source.py           # ✓ ERA5Source — NetCDF-backed ClimateDataSource, 2015-present
-│   │   │   ├── cmip6_projector.py       # CMIP6 scenario projection — planned
+│   │   │   ├── cmip6_source.py          # ✓ CMIP6Source — scenario/horizon-aware ClimateDataSource
 │   │   │   └── soil_matcher.py          # SoilGrids integration — planned
 │   │   ├── phases/
-│   │   │   └── describe.py              # ✓ DescribePhaseRunner — climate + optional imagery → DescribeResult
+│   │   │   ├── describe.py              # ✓ DescribePhaseRunner — climate + optional imagery → DescribeResult
+│   │   │   └── predict.py               # ✓ PredictPhaseRunner — CMIP6 × scenarios × horizons → PredictResult
 │   │   ├── imagery/
 │   │   │   ├── imagery_source.py        # ✓ ImagerySource ABC — fetch(variable, region, time_range) → DataArray
 │   │   │   ├── sentinel2_source.py      # ✓ Sentinel2Source — GeoTIFF-backed ImagerySource (NDVI)
@@ -144,6 +145,7 @@ groundshift/
 │   │   ├── suitability_result.py        # ✓ score/confidence as DataArrays
 │   │   ├── divergence_result.py         # ✓ DivergenceResult — signed climate-vs-observed surface
 │   │   ├── describe_result.py           # ✓ DescribeResult — suitability + optional divergence
+│   │   ├── predict_result.py            # ✓ PredictResult / PredictProjection — suitability per scenario+horizon
 │   │   ├── time_range.py                # ✓ start/end with scenario and horizon support
 │   │   ├── calibration_anchor.py        # ✓ CalibrationAnchor — role-validated reference zone
 │   │   └── anchor_score.py              # ✓ AnchorScore — per-run score + alert result
@@ -160,7 +162,7 @@ groundshift/
 │   │   ├── __init__.py
 │   │   └── resolver.py                  # ✓ resolve_region(id) → BoundingBox; UnknownRegionError
 │   │
-│   └── cli.py                           # ✓ build_arg_parser + run_describe; groundshift run entrypoint
+│   └── cli.py                           # ✓ run_describe + run_predict; groundshift run --phase describe|predict
 │
 ├── crop_profiles/
 │   ├── coffee_arabica.yaml              # ✓ Arabica thresholds (temp, precipitation, altitude)
@@ -183,8 +185,8 @@ groundshift/
 │   │   ├── models/                      # ✓ all models covered
 │   │   ├── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   │   ├── regions/                     # ✓ test_resolver.py
-│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5, test_download_sentinel2
-│   │   └── test_cli.py                  # ✓ argument parsing, --source, --imagery, invalid args
+│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5, test_download_sentinel2, test_download_cmip6
+│   │   └── test_cli.py                  # ✓ argument parsing, run_describe, run_predict, --source, --imagery
 │   ├── integration/
 │   │   └── test_describe_phase_smoke.py # ✓ full pipeline + CLI + anchor + ERA5/Sentinel-2 skip tests
 │   └── fixtures/                        # synthetic datasets — not yet written
@@ -198,7 +200,8 @@ groundshift/
 ├── data/
 │   ├── worldclim/10m/                   # WorldClim GeoTIFFs (downloaded by ingest script, gitignored)
 │   ├── era5/                            # ERA5 NetCDF files (downloaded by ingest script, gitignored)
-│   └── sentinel2/                       # Sentinel-2 NDVI GeoTIFFs (downloaded by ingest script, gitignored)
+│   ├── sentinel2/                       # Sentinel-2 NDVI GeoTIFFs (downloaded by ingest script, gitignored)
+│   └── cmip6/                           # CMIP6 projection NetCDFs (downloaded by ingest script, gitignored)
 │
 ├── scripts/
 │   ├── __init__.py
@@ -206,7 +209,8 @@ groundshift/
 │       ├── __init__.py
 │       ├── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
 │       ├── download_era5.py             # ✓ downloads ERA5 reanalysis to data/era5/ (requires cdsapi)
-│       └── download_sentinel2.py        # ✓ downloads Sentinel-2 NDVI composite via AWS Earth Search (free)
+│       ├── download_sentinel2.py        # ✓ downloads Sentinel-2 NDVI composite via AWS Earth Search (free)
+│       └── download_cmip6.py            # ✓ downloads CMIP6 projections via Pangeo/Google Cloud (free)
 │
 ├── infrastructure/
 │   └── aws/                             # Lambda, S3, RDS terraform/CDK
@@ -633,7 +637,7 @@ Implementations:
 |---|---|---|---|
 | `WorldClimSource` | Historical baseline climatology (1970–2000) | Describe | ✓ Complete |
 | `ERA5Source` | Recent observed climate (2015–present) | Describe | ✓ Complete |
-| `CMIP6Source` | Projected climate under SSP2/SSP5 scenarios | Predict | Planned |
+| `CMIP6Source` | Projected climate under SSP2/SSP5 scenarios | Predict | ✓ Complete |
 
 Each implementation clips to the requested `BoundingBox`, reprojects to EPSG:4326, and returns a consistently named DataArray. The pipeline is indifferent to which source is used — swap `WorldClimSource` for `CMIP6Source` and the same `compute_envelope` call produces a projected suitability surface instead of a current one.
 
@@ -874,7 +878,7 @@ GROUNDSHIFT_API_PORT=8000
 | Phase | Scope | Status |
 |---|---|---|
 | Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source, DescribePhaseRunner, calibration anchor monitoring, imagery divergence surface, CLI `groundshift run --phase describe --source --imagery`. Landsat historical trend detection is next. | ✓ Functional |
-| Phase 2 — Predict | CMIP6 projection pipeline, SSP2/SSP5 scenarios, scenario comparison | Planned |
+| Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. Scenario comparison surface and confidence surfaces are next. | ✓ Functional |
 | Phase 3 — Prescribe | Opportunity zone detection, transition recommender, cooperative infrastructure layer | Planned |
 | API + delivery | REST API, web app, mobile app, offline package generation | Planned |
 | Plugin expansion | Frost risk, pest/disease, phenology plugins | Planned |

@@ -46,7 +46,7 @@ Additional crop profiles (wine grape, olive, wheat, cocoa, tea) are included in 
 - **Multiple climate data sources** — WorldClim v2.1 (1970–2000 baseline) and ERA5 reanalysis (2015–present) both implement the same `ClimateDataSource` interface; swap with `--source era5`
 - **Calibration anchor monitoring** — named reference zones (origin centers, production references, stress references) scored on every run; alerts fire when a documented high-suitability zone drops below threshold
 - **Satellite imagery divergence** — Sentinel-2 NDVI composites compared against the climate suitability score; the signed divergence surface shows where model and ground truth agree or disagree; add `--imagery sentinel2`
-- **CMIP6 suitability projection** — SSP2 and SSP5 scenarios, 2040 / 2060 / 2100 horizons (planned)
+- **CMIP6 suitability projection** — SSP2 and SSP5 scenarios, 2040 / 2060 / 2100 horizons; run with `--phase predict`
 - **Landsat historical trend detection** — multi-decade NDVI change detection, onset date estimation (planned)
 - **Opportunity zone identification** — emerging suitability zones with infrastructure and market-access scoring (planned)
 - **Plugin architecture** — extensible evidence layers (pest/disease, frost risk, groundwater, land tenure) drop in without touching core logic
@@ -97,6 +97,9 @@ python scripts/ingest/download_era5.py
 
 # Sentinel-2 NDVI composite — free, no account required (uses AWS Earth Search)
 python scripts/ingest/download_sentinel2.py --region ethiopia --year 2023
+
+# CMIP6 climate projections — free, no account required (uses Pangeo/Google Cloud)
+python scripts/ingest/download_cmip6.py
 ```
 
 ### Run your first analysis
@@ -125,6 +128,22 @@ groundshift run --crop coffee --region ethiopia --phase describe --imagery senti
 
 # Use ERA5 reanalysis instead of WorldClim baseline
 groundshift run --crop coffee --region ethiopia --phase describe --source era5
+
+# Predict future suitability under both SSP scenarios across 2040 / 2060 / 2100
+# (requires CMIP6 data — run download_cmip6.py first)
+groundshift run --crop coffee --region ethiopia --phase predict
+
+# Sample output:
+# Groundshift — Predict phase
+#   crop:    coffee
+#   region:  ethiopia
+#
+#   [ssp245 / 2040]    min=0.000  mean=0.041  max=0.998  viable=399 cells
+#   [ssp245 / 2060]    min=0.000  mean=0.033  max=0.972  viable=361 cells
+#   [ssp245 / 2100]    min=0.000  mean=0.025  max=0.934  viable=289 cells
+#   [ssp585 / 2040]    min=0.000  mean=0.039  max=0.991  viable=387 cells
+#   [ssp585 / 2060]    min=0.000  mean=0.027  max=0.951  viable=318 cells
+#   [ssp585 / 2100]    min=0.000  mean=0.011  max=0.823  viable=174 cells
 ```
 
 ### Run tests
@@ -192,7 +211,7 @@ See [TDD_CONTRACT.md](TDD_CONTRACT.md) for the evidence base behind this discipl
 |---|---|---|---|
 | Climate baseline (1970–2000) | WorldClim v2.1 | CC BY 4.0 | ✓ Integrated |
 | Recent observed climate (2015–present) | ERA5 (Copernicus/ECMWF) | Copernicus licence | ✓ Integrated |
-| Climate projections | CMIP6 (ESGF) | CC BY 4.0 | Planned |
+| Climate projections | CMIP6 (Pangeo/Google Cloud) | CC BY 4.0 | ✓ Integrated |
 | Crop suitability baselines | FAO GAEZ v4 | CC BY-NC 4.0 | Planned |
 | Satellite imagery | Sentinel-2 (AWS Earth Search) | CC BY 4.0 | ✓ Integrated |
 | Historical imagery | Landsat (USGS/AWS) | Public domain | Planned |
@@ -220,7 +239,7 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe phase is complete and runnable end-to-end — climate envelope scoring, calibration anchor monitoring, and Sentinel-2 imagery divergence are all wired into the CLI. The Predict phase (CMIP6 projections) is next.
+Active development. The Describe and Predict phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, and Sentinel-2 imagery divergence. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. The Prescribe phase (opportunity zones, transition recommendations) is next.
 
 | Component | Status |
 |---|---|
@@ -229,6 +248,8 @@ Active development. The Describe phase is complete and runnable end-to-end — c
 | SuitabilityResult (score, confidence as DataArrays) | ✓ Complete |
 | DescribeResult (suitability + divergence) | ✓ Complete |
 | DivergenceResult (climate vs. observed NDVI surface) | ✓ Complete |
+| PredictProjection (scenario + horizon_year + suitability) | ✓ Complete |
+| PredictResult (list of projections) | ✓ Complete |
 | Plugin base class (GroundshiftPlugin ABC) | ✓ Complete |
 | Plugin registry | ✓ Complete |
 | Three-tier aggregator (existential / stress / custom, envelope as hard gate) | ✓ Complete |
@@ -245,13 +266,15 @@ Active development. The Describe phase is complete and runnable end-to-end — c
 | Calibration anchor model + loader + scorer | ✓ Complete |
 | Regions resolver (Ethiopia, Colombia, Central America) | ✓ Complete |
 | DescribePhaseRunner (climate + optional imagery, returns DescribeResult) | ✓ Complete |
+| CMIP6Source (scenario/horizon-aware ClimateDataSource) | ✓ Complete |
+| PredictPhaseRunner (SSP2/SSP5 × 2040/2060/2100, returns PredictResult) | ✓ Complete |
 | CLI (`groundshift run --crop --region --phase --source --imagery`) | ✓ Complete |
 | Raster utility (geodataframe_to_modifier) | ✓ Complete |
 | WorldClim download script | ✓ Complete |
 | ERA5 download script | ✓ Complete |
 | Sentinel-2 download script (AWS Earth Search, free, no auth) | ✓ Complete |
+| CMIP6 download script (Pangeo/Google Cloud, free, no auth) | ✓ Complete |
 | Landsat historical trend detection | Planned |
-| CMIP6 projection pipeline | Planned |
 | Opportunity zone detector (Phase 3) | Planned |
 | REST API | Planned |
 
