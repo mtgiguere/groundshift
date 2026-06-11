@@ -62,9 +62,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--imagery",
+        nargs="+",
         default=None,
         choices=["sentinel2", "landsat"],
-        help="Imagery source: sentinel2 for NDVI divergence, landsat for historical trend.",
+        help="Imagery source(s): sentinel2, landsat, or both.",
     )
     return parser
 
@@ -89,12 +90,9 @@ def run_describe(args: argparse.Namespace) -> None:
     else:
         source = WorldClimSource(_WORLDCLIM_DIR)
         time_range = _WORLDCLIM_TIME_RANGE
-    imagery_source = None
-    landsat_source = None
-    if args.imagery == "sentinel2":
-        imagery_source = Sentinel2Source(_SENTINEL2_DIR)
-    elif args.imagery == "landsat":
-        landsat_source = LandsatSource(_LANDSAT_DIR)
+    active_imagery = set(args.imagery or [])
+    imagery_source = Sentinel2Source(_SENTINEL2_DIR) if "sentinel2" in active_imagery else None
+    landsat_source = LandsatSource(_LANDSAT_DIR) if "landsat" in active_imagery else None
     runner = DescribePhaseRunner(
         source, PluginRegistry(), imagery_source=imagery_source, landsat_source=landsat_source
     )
