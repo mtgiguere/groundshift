@@ -110,21 +110,21 @@ groundshift/
 │   │   │   └── change_detector.py       # Multi-temporal change detection — planned
 │   │   ├── opportunity/
 │   │   │   ├── gain_zone_detector.py    # ✓ GainZoneDetector — low current suitability + positive delta → mask
-│   │   │   ├── loss_zone_detector.py    # Phase 3 — planned
-│   │   │   ├── emergence_detector.py    # Phase 3 — planned (multi-signal confidence tiers)
-│   │   │   └── transition_recommender.py # Phase 3 — planned
+│   │   │   ├── loss_zone_detector.py    # ✓ LossZoneDetector — high current suitability + negative delta → mask
+│   │   │   ├── transition_recommender.py # ✓ TransitionRecommender — Jaccard envelope overlap across candidate crops
+│   │   │   └── emergence_detector.py    # Multi-signal confidence tiers — planned
 │   │   ├── aggregator.py                # ✓ three-tier aggregation (existential/stress/custom), envelope gate
 │   │   ├── scorer.py                    # ✓ runs registry plugins against envelope, returns SuitabilityResult
 │   │   └── utils/
 │   │       └── raster.py                # ✓ geodataframe_to_modifier — rasterize GeoDataFrame to SuitabilityModifier
 │   │
 │   ├── api/
-│   │   ├── app.py                       # ✓ create_app(profiles_dir) — FastAPI factory, testable
+│   │   ├── app.py                       # ✓ create_app(profiles_dir, results_dir) — FastAPI factory, testable
 │   │   └── routes/
 │   │       ├── crops.py                 # ✓ GET /api/v1/crops, GET /api/v1/crops/{id}
-│   │       ├── regions.py               # GET /api/v1/regions — planned
+│   │       ├── regions.py               # ✓ GET /api/v1/regions, GET /api/v1/regions/{id}
+│   │       ├── emerging.py              # ✓ GET /api/v1/crops/{id}/emerging — serves pre-computed JSON results
 │   │       ├── runs.py                  # GET /api/v1/runs, GET /api/v1/runs/{id}/surfaces — planned
-│   │       ├── emerging.py              # GET /api/v1/crops/{id}/emerging — planned
 │   │       └── packages.py              # GET /api/v1/packages/{crop}/{region} — planned
 │   │
 │   ├── plugins/
@@ -149,6 +149,8 @@ groundshift/
 │   │   ├── predict_result.py            # ✓ PredictResult / PredictProjection — suitability per scenario+horizon
 │   │   ├── prescribe_result.py          # ✓ PrescribeResult / ChangeProjection — delta surface per scenario+horizon
 │   │   ├── opportunity_zone.py          # ✓ OpportunityZone / OpportunityZoneResult — gain-zone mask per scenario+horizon
+│   │   ├── loss_zone.py                 # ✓ LossZone / LossZoneResult — loss-zone mask per scenario+horizon
+│   │   ├── transition_result.py         # ✓ TransitionSuggestion / TransitionResult — ranked alternative crops
 │   │   ├── trend_result.py              # ✓ TrendResult — per-pixel NDVI/year slope DataArray
 │   │   ├── time_range.py                # ✓ start/end with scenario and horizon support
 │   │   ├── calibration_anchor.py        # ✓ CalibrationAnchor — role-validated reference zone
@@ -278,10 +280,12 @@ Each analysis run executes one or more phases in sequence. Phases share a common
 
 **Implemented:**
 - `PrescribePhaseRunner` computes signed per-cell delta surfaces (projected − current suitability) for each scenario+horizon combination using `DescribeResult` and `PredictResult`.
-- `GainZoneDetector` scans those delta surfaces for opportunity zones — cells currently below a suitability threshold but gaining meaningfully. Outputs one boolean mask per scenario+horizon with a confidence tier (currently `"low"` — single CMIP6 signal; medium/high tiers require Landsat trend and plugin agreement).
-- Both are wired into `run_prescribe`; opportunity zone cell counts appear in CLI output.
+- `GainZoneDetector` scans those delta surfaces for opportunity zones — cells currently below a suitability threshold but gaining meaningfully. Outputs one boolean mask per scenario+horizon with confidence `"low"` (single CMIP6 signal; medium/high tiers require Landsat trend and plugin agreement — not yet implemented).
+- `LossZoneDetector` is the mirror counterpart — cells currently above the suitability threshold but declining significantly. Same per-scenario+horizon boolean mask output, same confidence model.
+- `TransitionRecommender` takes the current crop profile and a list of candidate profiles and ranks them by Jaccard overlap of their viable climate ranges, averaged across all shared variables. Score of 1.0 means identical envelope; 0.0 means no overlap. This answers: *given that this region suits crop X, which alternatives have the most similar requirements?*
+- All three are wired into `run_prescribe`; the CLI prints opportunity zone counts, loss zone counts, and transition suggestions per scenario+horizon.
 
-Loss zone detection, transition recommendations, and infrastructure context are next.
+Cooperative infrastructure context is next.
 
 **Inputs:**
 - Phase 1 and Phase 2 outputs (DescribeResult + PredictResult)
@@ -482,14 +486,18 @@ The REST API is the delivery boundary between pipeline artifacts and all clients
 
 ### Core Endpoints
 
-| Endpoint | Description |
-|---|---|
-| `GET /api/v1/crops` | List available crop profiles |
-| `GET /api/v1/regions` | List/search named regions |
-| `GET /api/v1/runs` | List pipeline runs with status |
-| `GET /api/v1/runs/{run_id}/surfaces` | Suitability surfaces for a completed run |
-| `GET /api/v1/crops/{crop_id}/emerging` | Latest emerging regions with confidence tiers |
-| `GET /api/v1/packages/{crop_id}/{region_id}` | Download pre-generated offline package |
+| Endpoint | Status | Description |
+|---|---|---|
+| `GET /api/v1/crops` | ✓ Live | List available crop profiles |
+| `GET /api/v1/crops/{id}` | ✓ Live | Crop detail with full climate envelope |
+| `GET /api/v1/regions` | ✓ Live | List named regions with bounding boxes |
+| `GET /api/v1/regions/{id}` | ✓ Live | Single region detail |
+| `GET /api/v1/crops/{id}/emerging` | ✓ Live | Pre-computed opportunity zone results; `?region=` filter supported |
+| `GET /api/v1/runs` | Planned | List pipeline runs with status |
+| `GET /api/v1/runs/{run_id}/surfaces` | Planned | Suitability surfaces for a completed run |
+| `GET /api/v1/packages/{crop_id}/{region_id}` | Planned | Download pre-generated offline package |
+
+**Emerging zone result storage:** Pre-computed results are written to `data/results/emerging/{crop_id}_{region_id}.json` by the CLI pipeline. The `GET /api/v1/crops/{id}/emerging` endpoint reads those files at request time — no pipeline runs on request. An export script (`scripts/export_emerging.py`, planned) will automate writing these files after each prescribe run.
 
 All endpoints return GeoJSON by default. The `Accept` header or a `?format=` query parameter selects simplified GeoJSON (for mobile bandwidth) or full-resolution GeoJSON.
 
@@ -894,7 +902,7 @@ GROUNDSHIFT_API_PORT=8000
 |---|---|---|
 | Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source + LandsatSource, DescribePhaseRunner, calibration anchor monitoring, NDVI divergence surface, Landsat historical trend surface, CLI `groundshift run --phase describe --source --imagery`. | ✓ Functional |
 | Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. | ✓ Functional |
-| Phase 3 — Prescribe | Delta surfaces and opportunity zone detection complete. `PrescribePhaseRunner` + `GainZoneDetector`; CLI `groundshift run --phase prescribe` prints gaining/losing cells and opportunity zone counts per scenario+horizon. Loss zone detection, transition recommender, and cooperative infrastructure layer are next. | ✓ Partially functional |
-| API + delivery | Skeleton live. `GET /api/v1/crops` and `GET /api/v1/crops/{id}` complete. Regions, runs, emerging, and packages endpoints planned. Web app, mobile, offline generation planned. | ✓ Partially functional |
+| Phase 3 — Prescribe | Delta surfaces, opportunity zone detection, loss zone detection, and transition recommendations complete. `PrescribePhaseRunner` + `GainZoneDetector` + `LossZoneDetector` + `TransitionRecommender`; CLI prints gaining/losing cells, opportunity zone counts, loss zone counts, and ranked transition suggestions per scenario+horizon. Cooperative infrastructure context is next. | ✓ Mostly functional |
+| API + delivery | `GET /api/v1/crops`, `GET /api/v1/crops/{id}`, `GET /api/v1/regions`, `GET /api/v1/regions/{id}`, `GET /api/v1/crops/{id}/emerging` all live. Runs, packages endpoints planned. Web app, mobile, offline generation planned. | ✓ Partially functional |
 | Plugin expansion | Frost risk, pest/disease, phenology plugins | Planned |
 | Additional crops | Wine grape, olive, wheat profiles production-ready | Planned |

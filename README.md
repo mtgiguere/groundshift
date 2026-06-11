@@ -50,7 +50,9 @@ Additional crop profiles (wine grape, olive, wheat, cocoa, tea) are included in 
 - **Climate change delta surfaces** — signed per-cell suitability change (projected − current) per scenario and horizon; run with `--phase prescribe`
 - **Opportunity zone detection** — cells currently low-suitability but meaningfully gaining; appended to every Prescribe run
 - **Landsat historical NDVI trend** — per-pixel OLS slope over the full Landsat archive (1985–present); add `--imagery landsat`
-- **REST API** — FastAPI service exposing crop profiles; `GET /api/v1/crops`, `GET /api/v1/crops/{id}` live; more endpoints in progress
+- **Loss zone detection** — cells currently viable but meaningfully declining under projected scenarios; appended to every Prescribe run alongside opportunity zones
+- **Transition recommendations** — for losing regions, ranks alternative crops by Jaccard overlap of viable climate envelopes; the higher the score, the more similar the climate requirements
+- **REST API** — FastAPI service; `GET /api/v1/crops`, `GET /api/v1/crops/{id}`, `GET /api/v1/regions`, `GET /api/v1/regions/{id}`, `GET /api/v1/crops/{id}/emerging` all live
 - **Opportunity zone identification with infrastructure context** — scoring against cooperative and market access layers (planned)
 - **Plugin architecture** — extensible evidence layers (pest/disease, frost risk, groundwater, land tenure) drop in without touching core logic
 - **Confidence visualization** — uncertainty surfaces alongside every suitability output
@@ -181,6 +183,14 @@ groundshift run --crop coffee --region ethiopia --phase prescribe
 #   [ssp585 / 2040]      83 cells  confidence=low
 #   [ssp585 / 2060]      61 cells  confidence=low
 #   [ssp585 / 2100]      38 cells  confidence=low
+#
+#   loss zones (currently viable, meaningfully declining):
+#   [ssp245 / 2040]     214 cells  confidence=low
+#   [ssp245 / 2060]     263 cells  confidence=low
+#   [ssp245 / 2100]     318 cells  confidence=low
+#   [ssp585 / 2040]     231 cells  confidence=low
+#   [ssp585 / 2060]     301 cells  confidence=low
+#   [ssp585 / 2100]     389 cells  confidence=low
 ```
 
 ### Run tests
@@ -276,7 +286,7 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces (projected − current suitability) and detects opportunity zones — cells currently low-suitability but meaningfully gaining. The REST API is live with crop profile endpoints. Loss zone detection, transition recommendations, and additional API endpoints are next.
+Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces (projected − current suitability), detects opportunity zones and loss zones, and ranks alternative crops by climate envelope overlap. The REST API serves crop profiles, named regions, and pre-computed opportunity zone results. Cooperative infrastructure context and an export script to feed the API are next.
 
 | Component | Status |
 |---|---|
@@ -312,6 +322,8 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | PredictPhaseRunner (SSP2/SSP5 × 2040/2060/2100, returns PredictResult) | ✓ Complete |
 | PrescribePhaseRunner (delta surfaces from DescribeResult + PredictResult) | ✓ Complete |
 | GainZoneDetector (emerging cells: low current suitability + positive delta) | ✓ Complete |
+| LossZoneDetector (declining cells: high current suitability + negative delta) | ✓ Complete |
+| TransitionRecommender (Jaccard envelope overlap across candidate crop profiles) | ✓ Complete |
 | LandsatSource (file-backed ImagerySource, OLS trend slope GeoTIFF) | ✓ Complete |
 | CLI (`groundshift run --crop --region --phase --source --imagery`) | ✓ Complete |
 | Raster utility (geodataframe_to_modifier) | ✓ Complete |
@@ -321,8 +333,9 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | CMIP6 download script (Pangeo/Google Cloud, free, no auth) | ✓ Complete |
 | Landsat download script (AWS Earth Search, free, no auth; OLS trend) | ✓ Complete |
 | REST API — GET /api/v1/crops, GET /api/v1/crops/{id} | ✓ Complete |
-| Loss zone detector (high current suitability + significantly negative delta) | Planned |
-| Transition recommender (cross-profile climate envelope comparison) | Planned |
-| REST API — regions, runs, emerging, packages endpoints | Planned |
+| REST API — GET /api/v1/regions, GET /api/v1/regions/{id} | ✓ Complete |
+| REST API — GET /api/v1/crops/{id}/emerging (pre-computed results, ?region= filter) | ✓ Complete |
+| Emerging zone export script (writes results for API to serve) | Planned |
+| REST API — runs, packages endpoints | Planned |
 
 *Built with the belief that information equity is a precondition for climate adaptation justice.*
