@@ -99,11 +99,12 @@ groundshift/
 │   │   │   ├── cmip6_projector.py       # CMIP6 scenario projection — planned
 │   │   │   └── soil_matcher.py          # SoilGrids integration — planned
 │   │   ├── phases/
-│   │   │   └── describe.py              # ✓ DescribePhaseRunner — end-to-end Describe orchestration
+│   │   │   └── describe.py              # ✓ DescribePhaseRunner — climate + optional imagery → DescribeResult
 │   │   ├── imagery/
-│   │   │   ├── sentinel2_pipeline.py    # Sentinel-2 ingestion + compositing — planned
+│   │   │   ├── imagery_source.py        # ✓ ImagerySource ABC — fetch(variable, region, time_range) → DataArray
+│   │   │   ├── sentinel2_source.py      # ✓ Sentinel2Source — GeoTIFF-backed ImagerySource (NDVI)
+│   │   │   ├── divergence.py            # ✓ compute_divergence(SuitabilityResult, ndvi) → DivergenceResult
 │   │   │   ├── landsat_archive.py       # Landsat historical access — planned
-│   │   │   ├── ndvi_analyzer.py         # NDVI/EVI computation + thresholds — planned
 │   │   │   └── change_detector.py       # Multi-temporal change detection — planned
 │   │   ├── opportunity/
 │   │   │   ├── emergence_detector.py    # Phase 3 — planned
@@ -141,6 +142,8 @@ groundshift/
 │   │   ├── plugin_metadata.py           # ✓ plugin identity, threat_tier, custom_weight
 │   │   ├── suitability_modifier.py      # ✓ factor_value/probability/confidence as DataArrays
 │   │   ├── suitability_result.py        # ✓ score/confidence as DataArrays
+│   │   ├── divergence_result.py         # ✓ DivergenceResult — signed climate-vs-observed surface
+│   │   ├── describe_result.py           # ✓ DescribeResult — suitability + optional divergence
 │   │   ├── time_range.py                # ✓ start/end with scenario and horizon support
 │   │   ├── calibration_anchor.py        # ✓ CalibrationAnchor — role-validated reference zone
 │   │   └── anchor_score.py              # ✓ AnchorScore — per-run score + alert result
@@ -180,10 +183,10 @@ groundshift/
 │   │   ├── models/                      # ✓ all models covered
 │   │   ├── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   │   ├── regions/                     # ✓ test_resolver.py
-│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5
-│   │   └── test_cli.py                  # ✓ argument parsing, required args, invalid phase
+│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5, test_download_sentinel2
+│   │   └── test_cli.py                  # ✓ argument parsing, --source, --imagery, invalid args
 │   ├── integration/
-│   │   └── test_describe_phase_smoke.py # ✓ full pipeline + CLI + anchor smoke tests (requires WorldClim data)
+│   │   └── test_describe_phase_smoke.py # ✓ full pipeline + CLI + anchor + ERA5/Sentinel-2 skip tests
 │   └── fixtures/                        # synthetic datasets — not yet written
 │
 ├── docs/
@@ -194,14 +197,16 @@ groundshift/
 │
 ├── data/
 │   ├── worldclim/10m/                   # WorldClim GeoTIFFs (downloaded by ingest script, gitignored)
-│   └── era5/                            # ERA5 NetCDF files (downloaded by ingest script, gitignored)
+│   ├── era5/                            # ERA5 NetCDF files (downloaded by ingest script, gitignored)
+│   └── sentinel2/                       # Sentinel-2 NDVI GeoTIFFs (downloaded by ingest script, gitignored)
 │
 ├── scripts/
 │   ├── __init__.py
 │   └── ingest/                          # One-time and scheduled ingestion
 │       ├── __init__.py
 │       ├── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
-│       └── download_era5.py             # ✓ downloads ERA5 reanalysis to data/era5/ (requires cdsapi)
+│       ├── download_era5.py             # ✓ downloads ERA5 reanalysis to data/era5/ (requires cdsapi)
+│       └── download_sentinel2.py        # ✓ downloads Sentinel-2 NDVI composite via AWS Earth Search (free)
 │
 ├── infrastructure/
 │   └── aws/                             # Lambda, S3, RDS terraform/CDK
@@ -634,6 +639,57 @@ Each implementation clips to the requested `BoundingBox`, reprojects to EPSG:432
 
 ---
 
+## Imagery Pipeline
+
+`ImagerySource` is an ABC that mirrors `ClimateDataSource` exactly — same `fetch(variable, region, time_range) → DataArray` contract. This symmetry is intentional: imagery and climate data are both spatial evidence streams, and both deserve an interchangeable-source abstraction.
+
+```python
+class ImagerySource(ABC):
+    @abstractmethod
+    def fetch(self, variable: str, region: BoundingBox, time_range: TimeRange) -> xr.DataArray:
+        """Return a DataArray of imagery values for the named variable over the region."""
+```
+
+Implementations:
+
+| Implementation | Data | Variable | Status |
+|---|---|---|---|
+| `Sentinel2Source` | Pre-computed NDVI GeoTIFF | `"ndvi"` | ✓ Complete |
+| `LandsatSource` | Historical archive | `"ndvi_trend"` | Planned |
+
+### Divergence
+
+NDVI is not a suitability modifier — it is an independent ground-truth signal that answers a different question: *is vegetation actually growing here?* It does not feed into the suitability score. Instead, it is compared against the climate score to produce a **divergence surface**.
+
+```python
+def compute_divergence(suitability: SuitabilityResult, ndvi: xr.DataArray) -> DivergenceResult:
+```
+
+NDVI ∈ [−1, 1] is normalized to [0, 1] via `(ndvi + 1) / 2` before subtraction, making it directly comparable to the suitability score.
+
+| Divergence sign | Meaning |
+|---|---|
+| Positive | Climate model predicts viability, satellite sees weak vegetation — potential emerging stress or model overestimation |
+| Zero | Model and observed signal agree |
+| Negative | Satellite sees strong vegetation the model underestimates — possible microclimate, variety adaptation, or model gap |
+
+The divergence surface is the most scientifically valuable output of the Describe phase. It is where farmer ground truth meets modelled climate — and where the two disagreeing is often more informative than either alone.
+
+### DescribeResult
+
+`DescribePhaseRunner` returns `DescribeResult`, not `SuitabilityResult`. This separates phase-specific output (which may include imagery signals) from the general suitability model (which Predict and Prescribe phases also use).
+
+```python
+@dataclass
+class DescribeResult:
+    suitability: SuitabilityResult
+    divergence: DivergenceResult | None  # None when no imagery source is provided
+```
+
+The runner accepts `imagery_source: ImagerySource | None = None`. When absent, divergence is `None` and the output is identical to a pure climate-envelope run.
+
+---
+
 ## Plugin Architecture
 
 See [PLUGIN.md](PLUGIN.md) for the full plugin development guide.
@@ -817,7 +873,7 @@ GROUNDSHIFT_API_PORT=8000
 
 | Phase | Scope | Status |
 |---|---|---|
-| Phase 1 — Describe | Climate envelope complete: WorldClimSource + ERA5Source, DescribePhaseRunner, calibration anchor monitoring, CLI `groundshift run --phase describe`. Imagery pipeline (Sentinel-2 NDVI, Landsat trend detection) is next. | In Progress |
+| Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source, DescribePhaseRunner, calibration anchor monitoring, imagery divergence surface, CLI `groundshift run --phase describe --source --imagery`. Landsat historical trend detection is next. | ✓ Functional |
 | Phase 2 — Predict | CMIP6 projection pipeline, SSP2/SSP5 scenarios, scenario comparison | Planned |
 | Phase 3 — Prescribe | Opportunity zone detection, transition recommender, cooperative infrastructure layer | Planned |
 | API + delivery | REST API, web app, mobile app, offline package generation | Planned |
