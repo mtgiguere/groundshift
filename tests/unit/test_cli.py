@@ -12,6 +12,7 @@ from groundshift.models.opportunity_zone import OpportunityZone, OpportunityZone
 from groundshift.models.predict_result import PredictProjection, PredictResult
 from groundshift.models.prescribe_result import ChangeProjection, PrescribeResult
 from groundshift.models.suitability_result import SuitabilityResult
+from groundshift.models.transition_result import TransitionResult, TransitionSuggestion
 
 # ---------------------------------------------------------------------------
 # Shared fake data helpers
@@ -67,6 +68,15 @@ def _fake_loss_zone_result() -> LossZoneResult:
         zones=[
             LossZone("ssp245", 2040, mask, "low"),
             LossZone("ssp585", 2100, mask, "low"),
+        ]
+    )
+
+
+def _fake_transition_result() -> TransitionResult:
+    return TransitionResult(
+        suggestions=[
+            TransitionSuggestion("tea", "Tea", 0.82),
+            TransitionSuggestion("wine_grape", "Wine Grape", 0.61),
         ]
     )
 
@@ -476,3 +486,37 @@ class TestRunPrescribe:
                         run_prescribe(self._args())
         out = capsys.readouterr().out
         assert "cells" in out
+
+    def test_transition_suggestions_header_printed(self, capsys):
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=_fake_describe_result()):
+            with patch(
+                "groundshift.cli.PredictPhaseRunner.run", return_value=_fake_predict_result()
+            ):
+                with patch(
+                    "groundshift.cli.PrescribePhaseRunner.run",
+                    return_value=_fake_prescribe_result(),
+                ):
+                    with patch(
+                        "groundshift.cli.TransitionRecommender.recommend",
+                        return_value=_fake_transition_result(),
+                    ):
+                        run_prescribe(self._args())
+        assert "transition" in capsys.readouterr().out.lower()
+
+    def test_transition_suggestions_show_crop_names(self, capsys):
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=_fake_describe_result()):
+            with patch(
+                "groundshift.cli.PredictPhaseRunner.run", return_value=_fake_predict_result()
+            ):
+                with patch(
+                    "groundshift.cli.PrescribePhaseRunner.run",
+                    return_value=_fake_prescribe_result(),
+                ):
+                    with patch(
+                        "groundshift.cli.TransitionRecommender.recommend",
+                        return_value=_fake_transition_result(),
+                    ):
+                        run_prescribe(self._args())
+        out = capsys.readouterr().out
+        assert "Tea" in out
+        assert "0.82" in out
