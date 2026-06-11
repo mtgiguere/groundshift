@@ -100,7 +100,8 @@ groundshift/
 │   │   │   └── soil_matcher.py          # SoilGrids integration — planned
 │   │   ├── phases/
 │   │   │   ├── describe.py              # ✓ DescribePhaseRunner — climate + optional imagery → DescribeResult
-│   │   │   └── predict.py               # ✓ PredictPhaseRunner — CMIP6 × scenarios × horizons → PredictResult
+│   │   │   ├── predict.py               # ✓ PredictPhaseRunner — CMIP6 × scenarios × horizons → PredictResult
+│   │   │   └── prescribe.py             # ✓ PrescribePhaseRunner — delta surfaces from DescribeResult + PredictResult
 │   │   ├── imagery/
 │   │   │   ├── imagery_source.py        # ✓ ImagerySource ABC — fetch(variable, region, time_range) → DataArray
 │   │   │   ├── sentinel2_source.py      # ✓ Sentinel2Source — GeoTIFF-backed ImagerySource (NDVI)
@@ -146,6 +147,7 @@ groundshift/
 │   │   ├── divergence_result.py         # ✓ DivergenceResult — signed climate-vs-observed surface
 │   │   ├── describe_result.py           # ✓ DescribeResult — suitability + optional divergence
 │   │   ├── predict_result.py            # ✓ PredictResult / PredictProjection — suitability per scenario+horizon
+│   │   ├── prescribe_result.py          # ✓ PrescribeResult / ChangeProjection — delta surface per scenario+horizon
 │   │   ├── time_range.py                # ✓ start/end with scenario and horizon support
 │   │   ├── calibration_anchor.py        # ✓ CalibrationAnchor — role-validated reference zone
 │   │   └── anchor_score.py              # ✓ AnchorScore — per-run score + alert result
@@ -162,7 +164,7 @@ groundshift/
 │   │   ├── __init__.py
 │   │   └── resolver.py                  # ✓ resolve_region(id) → BoundingBox; UnknownRegionError
 │   │
-│   └── cli.py                           # ✓ run_describe + run_predict; groundshift run --phase describe|predict
+│   └── cli.py                           # ✓ run_describe + run_predict + run_prescribe; groundshift run --phase describe|predict|prescribe
 │
 ├── crop_profiles/
 │   ├── coffee_arabica.yaml              # ✓ Arabica thresholds (temp, precipitation, altitude)
@@ -178,7 +180,7 @@ groundshift/
 │   │   ├── conftest.py                  # ✓ make_plugin fixture (DataArray fields, threat_tier)
 │   │   ├── core/
 │   │   │   ├── envelope/                # ✓ test_threshold, test_envelope_scorer, test_profile_loader, test_climate_envelope, test_worldclim_source
-│   │   │   ├── phases/                  # ✓ test_describe_phase_runner
+│   │   │   ├── phases/                  # ✓ test_describe_phase_runner, test_predict_phase_runner, test_prescribe_phase_runner
 │   │   │   ├── utils/                   # ✓ test_raster
 │   │   │   ├── test_aggregator.py       # ✓ three-tier logic, probability/expected value, property tests
 │   │   │   └── test_scorer.py           # ✓
@@ -186,7 +188,7 @@ groundshift/
 │   │   ├── plugins/                     # ✓ test_plugin_base.py, test_registry.py
 │   │   ├── regions/                     # ✓ test_resolver.py
 │   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5, test_download_sentinel2, test_download_cmip6
-│   │   └── test_cli.py                  # ✓ argument parsing, run_describe, run_predict, --source, --imagery
+│   │   └── test_cli.py                  # ✓ argument parsing, run_describe, run_predict, run_prescribe, --source, --imagery
 │   ├── integration/
 │   │   └── test_describe_phase_smoke.py # ✓ full pipeline + CLI + anchor + ERA5/Sentinel-2 skip tests
 │   └── fixtures/                        # synthetic datasets — not yet written
@@ -268,12 +270,14 @@ Each analysis run executes one or more phases in sequence. Phases share a common
 
 **Question:** What should stakeholders do?
 
+**Implemented:** `PrescribePhaseRunner` computes signed per-cell delta surfaces (projected suitability − current suitability) for each scenario+horizon combination using `DescribeResult` and `PredictResult`. Positive delta cells are gaining viability; negative are losing. Opportunity zone detection, transition recommendations, and infrastructure context are next.
+
 **Inputs:**
-- Phase 1 and Phase 2 outputs
-- All active plugin modifier surfaces
-- Cooperative/mill infrastructure locations (where available)
-- OSM road network and port proximity
-- SPAM smallholder farm density
+- Phase 1 and Phase 2 outputs (DescribeResult + PredictResult)
+- All active plugin modifier surfaces (planned)
+- Cooperative/mill infrastructure locations (where available, planned)
+- OSM road network and port proximity (planned)
+- SPAM smallholder farm density (planned)
 
 **Outputs:**
 - **Loss zones with severity tiers** — where to prioritize transition support, ranked by onset timeline
@@ -879,7 +883,7 @@ GROUNDSHIFT_API_PORT=8000
 |---|---|---|
 | Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source, DescribePhaseRunner, calibration anchor monitoring, imagery divergence surface, CLI `groundshift run --phase describe --source --imagery`. Landsat historical trend detection is next. | ✓ Functional |
 | Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. Scenario comparison surface and confidence surfaces are next. | ✓ Functional |
-| Phase 3 — Prescribe | Opportunity zone detection, transition recommender, cooperative infrastructure layer | Planned |
+| Phase 3 — Prescribe | Core delta surfaces complete. `PrescribePhaseRunner` computes signed per-cell change (projected − current) per scenario+horizon; CLI `groundshift run --phase prescribe`. Opportunity zone detection, transition recommender, and cooperative infrastructure layer are next. | ✓ Partially functional |
 | API + delivery | REST API, web app, mobile app, offline package generation | Planned |
 | Plugin expansion | Frost risk, pest/disease, phenology plugins | Planned |
 | Additional crops | Wine grape, olive, wheat profiles production-ready | Planned |
