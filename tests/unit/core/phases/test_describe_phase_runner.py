@@ -5,7 +5,7 @@ import xarray as xr
 
 from groundshift.core.envelope.climate_source import ClimateDataSource
 from groundshift.models.bounding_box import BoundingBox
-from groundshift.models.suitability_result import SuitabilityResult
+from groundshift.models.describe_result import DescribeResult
 from groundshift.models.time_range import TimeRange
 from groundshift.plugins.registry import PluginRegistry
 
@@ -47,19 +47,19 @@ def _make_runner(source: ClimateDataSource, registry: PluginRegistry | None = No
     return DescribePhaseRunner(source, registry or PluginRegistry())
 
 
-def test_describe_phase_runner_returns_suitability_result():
+def test_describe_phase_runner_returns_describe_result():
     source = _ConstantSource({"mean_annual_temp_c": 21.0, "annual_precipitation_mm": 2000.0})
     runner = _make_runner(source)
     result = runner.run(_PROFILE, REGION, TIME_RANGE)
-    assert isinstance(result, SuitabilityResult)
+    assert isinstance(result, DescribeResult)
 
 
 def test_describe_phase_runner_result_fields_are_dataarrays():
     source = _ConstantSource({"mean_annual_temp_c": 21.0, "annual_precipitation_mm": 2000.0})
     runner = _make_runner(source)
     result = runner.run(_PROFILE, REGION, TIME_RANGE)
-    assert isinstance(result.score, xr.DataArray)
-    assert isinstance(result.confidence, xr.DataArray)
+    assert isinstance(result.suitability.score, xr.DataArray)
+    assert isinstance(result.suitability.confidence, xr.DataArray)
 
 
 def test_describe_phase_runner_optimal_climate_no_plugins_scores_one():
@@ -68,7 +68,7 @@ def test_describe_phase_runner_optimal_climate_no_plugins_scores_one():
     result = runner.run(_PROFILE, REGION, TIME_RANGE)
     import pytest
 
-    assert float(result.score.mean()) == pytest.approx(1.0)
+    assert float(result.suitability.score.mean()) == pytest.approx(1.0)
 
 
 def test_describe_phase_runner_impossible_climate_scores_zero():
@@ -77,7 +77,7 @@ def test_describe_phase_runner_impossible_climate_scores_zero():
     result = runner.run(_PROFILE, REGION, TIME_RANGE)
     import pytest
 
-    assert float(result.score.mean()) == pytest.approx(0.0)
+    assert float(result.suitability.score.mean()) == pytest.approx(0.0)
 
 
 def test_describe_phase_runner_passes_envelope_as_gate_to_scorer():
@@ -139,4 +139,4 @@ def test_describe_phase_runner_passes_envelope_as_gate_to_scorer():
 
     import pytest
 
-    assert float(result.score.mean()) == pytest.approx(0.0)
+    assert float(result.suitability.score.mean()) == pytest.approx(0.0)
