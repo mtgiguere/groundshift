@@ -80,3 +80,47 @@ def test_source_invalid_exits_with_error():
                 "foobar",
             ]
         )
+
+
+def test_imagery_defaults_to_none():
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        ["run", "--crop", "coffee", "--region", "ethiopia", "--phase", "describe"]
+    )
+    assert args.imagery is None
+
+
+def test_imagery_sentinel2_is_accepted():
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "run",
+            "--crop",
+            "coffee",
+            "--region",
+            "ethiopia",
+            "--phase",
+            "describe",
+            "--imagery",
+            "sentinel2",
+        ]
+    )
+    assert args.imagery == "sentinel2"
+
+
+def test_imagery_invalid_exits_with_error():
+    parser = build_arg_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "run",
+                "--crop",
+                "coffee",
+                "--region",
+                "ethiopia",
+                "--phase",
+                "describe",
+                "--imagery",
+                "foobar",
+            ]
+        )
