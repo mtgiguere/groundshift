@@ -14,6 +14,7 @@ from groundshift.core.envelope.yaml_loader import load_profile_from_yaml
 from groundshift.core.imagery.landsat_source import LandsatSource
 from groundshift.core.imagery.sentinel2_source import Sentinel2Source
 from groundshift.core.opportunity.gain_zone_detector import GainZoneDetector
+from groundshift.core.opportunity.loss_zone_detector import LossZoneDetector
 from groundshift.core.phases.describe import DescribePhaseRunner
 from groundshift.core.phases.predict import PredictPhaseRunner
 from groundshift.core.phases.prescribe import PrescribePhaseRunner
@@ -221,6 +222,7 @@ def run_prescribe(args: argparse.Namespace) -> None:
 
     result = PrescribePhaseRunner().run(describe_result, predict_result)
     opportunity = GainZoneDetector().detect(describe_result, result)
+    loss = LossZoneDetector().detect(describe_result, result)
 
     print("Groundshift — Prescribe phase")
     print(f"  crop:    {args.crop}")
@@ -244,6 +246,13 @@ def run_prescribe(args: argparse.Namespace) -> None:
     print()
     print("  opportunity zones (emerging — currently low suitability, meaningfully gaining):")
     for zone in opportunity.zones:
+        cell_count = int(zone.mask.values.sum())
+        label = f"[{zone.scenario} / {zone.horizon_year}]"
+        print(f"  {label:<18}  {cell_count:>4} cells  confidence={zone.confidence}")
+
+    print()
+    print("  loss zones (currently viable, meaningfully declining):")
+    for zone in loss.zones:
         cell_count = int(zone.mask.values.sum())
         label = f"[{zone.scenario} / {zone.horizon_year}]"
         print(f"  {label:<18}  {cell_count:>4} cells  confidence={zone.confidence}")
