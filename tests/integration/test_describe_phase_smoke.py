@@ -25,7 +25,7 @@ from groundshift.core.envelope.worldclim_source import WorldClimSource
 from groundshift.core.envelope.yaml_loader import load_profile_from_yaml
 from groundshift.core.phases.describe import DescribePhaseRunner
 from groundshift.models.bounding_box import BoundingBox
-from groundshift.models.suitability_result import SuitabilityResult
+from groundshift.models.describe_result import DescribeResult
 from groundshift.models.time_range import TimeRange
 from groundshift.plugins.registry import PluginRegistry
 
@@ -61,25 +61,23 @@ def ethiopia_result(_skip_if_no_data):
 
 
 @pytest.mark.integration
-def test_pipeline_returns_suitability_result(ethiopia_result):
-    assert isinstance(ethiopia_result, SuitabilityResult)
+def test_pipeline_returns_describe_result(ethiopia_result):
+    assert isinstance(ethiopia_result, DescribeResult)
 
 
 @pytest.mark.integration
 def test_score_is_a_dataarray(ethiopia_result):
-    assert isinstance(ethiopia_result.score, xr.DataArray)
+    assert isinstance(ethiopia_result.suitability.score, xr.DataArray)
 
 
 @pytest.mark.integration
 def test_confidence_is_a_dataarray(ethiopia_result):
-    assert isinstance(ethiopia_result.confidence, xr.DataArray)
+    assert isinstance(ethiopia_result.suitability.confidence, xr.DataArray)
 
 
 @pytest.mark.integration
 def test_score_values_are_in_unit_range(ethiopia_result):
-    # Non-NaN cells must be in [0, 1]. NaN cells (nodata from the source
-    # rasters) are allowed — they propagate naturally through the pipeline.
-    valid = ethiopia_result.score.values
+    valid = ethiopia_result.suitability.score.values
     finite = valid[~np.isnan(valid)]
     assert len(finite) > 0, "all cells are NaN — clip region may be outside raster extent"
     assert float(finite.min()) >= 0.0
@@ -88,19 +86,14 @@ def test_score_values_are_in_unit_range(ethiopia_result):
 
 @pytest.mark.integration
 def test_score_is_spatially_variable(ethiopia_result):
-    # Real climate data must produce spatial variation. A uniform surface
-    # would indicate the pipeline collapsed to a scalar somewhere.
-    valid = ethiopia_result.score.values
+    valid = ethiopia_result.suitability.score.values
     finite = valid[~np.isnan(valid)]
     assert float(finite.std()) > 0.0
 
 
 @pytest.mark.integration
 def test_ethiopia_highland_region_has_viable_coffee_cells(ethiopia_result):
-    # Yirgacheffe / Sidama is a documented arabica origin. The envelope
-    # must score at least some cells as viable (score > 0). If this fails,
-    # the thresholds or variable mapping are wrong.
-    assert float(ethiopia_result.score.max()) > 0.0
+    assert float(ethiopia_result.suitability.score.max()) > 0.0
 
 
 @pytest.mark.integration

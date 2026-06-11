@@ -70,7 +70,7 @@ def run_describe(args: argparse.Namespace) -> None:
     runner = DescribePhaseRunner(source, PluginRegistry())
     result = runner.run(profile, region, time_range)
 
-    score = result.score.values
+    score = result.suitability.score.values
     finite = score[~np.isnan(score)]
     viable = finite[finite > 0]
 
@@ -80,9 +80,19 @@ def run_describe(args: argparse.Namespace) -> None:
     print(f"  cells:   {len(finite)} scored, {len(viable)} viable (score > 0)")
     print(f"  score:   min={finite.min():.3f}  mean={finite.mean():.3f}  max={finite.max():.3f}")
 
+    if result.divergence is not None:
+        div = result.divergence.surface.values
+        finite_div = div[~np.isnan(div)]
+        if len(finite_div) > 0:
+            print(
+                f"  divergence (climate − observed):  "
+                f"min={finite_div.min():.3f}  mean={finite_div.mean():.3f}  "
+                f"max={finite_div.max():.3f}"
+            )
+
     anchors = load_anchors_from_profile(profile)
     if anchors:
-        anchor_scores = score_anchors(result, anchors)
+        anchor_scores = score_anchors(result.suitability, anchors)
         print()
         print("  calibration anchors:")
         for a in anchor_scores:
