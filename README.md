@@ -48,11 +48,13 @@ Additional crop profiles (wine grape, olive, wheat, cocoa, tea) are included in 
 - **Satellite imagery divergence** — Sentinel-2 NDVI composites compared against the climate suitability score; the signed divergence surface shows where model and ground truth agree or disagree; add `--imagery sentinel2`
 - **CMIP6 suitability projection** — SSP2 and SSP5 scenarios, 2040 / 2060 / 2100 horizons; run with `--phase predict`
 - **Climate change delta surfaces** — signed per-cell suitability change (projected − current) per scenario and horizon; run with `--phase prescribe`
-- **Opportunity zone detection** — cells currently low-suitability but meaningfully gaining; appended to every Prescribe run
+- **Opportunity zone detection** — cells currently low-suitability but meaningfully gaining; appended to every Prescribe run; confidence tier (low/medium/high) reflects how many independent signals agree
 - **Landsat historical NDVI trend** — per-pixel OLS slope over the full Landsat archive (1985–present); add `--imagery landsat`
-- **Loss zone detection** — cells currently viable but meaningfully declining under projected scenarios; appended to every Prescribe run alongside opportunity zones
+- **Loss zone detection** — cells currently viable but meaningfully declining under projected scenarios; appended to every Prescribe run alongside opportunity zones; same confidence tier logic
+- **Dynamic confidence tiers** — zone confidence is `"low"` (CMIP6 only), `"medium"` (CMIP6 + Landsat or Sentinel-2 agrees), or `"high"` (all three agree); no hardcoded values
 - **Transition recommendations** — for losing regions, ranks alternative crops by Jaccard overlap of viable climate envelopes; the higher the score, the more similar the climate requirements
-- **REST API** — FastAPI service; `GET /api/v1/crops`, `GET /api/v1/crops/{id}`, `GET /api/v1/regions`, `GET /api/v1/regions/{id}`, `GET /api/v1/crops/{id}/emerging` all live
+- **REST API** — FastAPI service; `GET /api/v1/crops`, `GET /api/v1/crops/{id}`, `GET /api/v1/regions`, `GET /api/v1/regions/{id}`, `GET /api/v1/crops/{id}/emerging`, `GET /api/v1/runs` (with `?crop_id=` and `?region_id=` filters) all live
+- **MBTiles export** — `scripts/export_mbtiles.py` converts any zone mask to a CivTAK-compatible MBTiles tile archive (zoom 4–10, TMS y-flip, configurable RGBA overlay colour)
 - **Opportunity zone identification with infrastructure context** — scoring against cooperative and market access layers (planned)
 - **Plugin architecture** — extensible evidence layers (pest/disease, frost risk, groundwater, land tenure) drop in without touching core logic
 - **Confidence visualization** — uncertainty surfaces alongside every suitability output
@@ -286,7 +288,7 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces (projected − current suitability), detects opportunity zones and loss zones, and ranks alternative crops by climate envelope overlap. The REST API serves crop profiles, named regions, and pre-computed opportunity zone results. Cooperative infrastructure context and an export script to feed the API are next.
+Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces, detects opportunity and loss zones with dynamic confidence tiers (low/medium/high based on signal agreement across CMIP6, Landsat, and Sentinel-2), and ranks alternative crops by climate envelope overlap. The REST API serves crop profiles, named regions, pre-computed emerging zone results, and a runs index. `scripts/export_mbtiles.py` exports zone masks to MBTiles for CivTAK offline use. Cooperative infrastructure context and a KMZ export are next.
 
 | Component | Status |
 |---|---|
@@ -321,8 +323,8 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | CMIP6Source (scenario/horizon-aware ClimateDataSource) | ✓ Complete |
 | PredictPhaseRunner (SSP2/SSP5 × 2040/2060/2100, returns PredictResult) | ✓ Complete |
 | PrescribePhaseRunner (delta surfaces from DescribeResult + PredictResult) | ✓ Complete |
-| GainZoneDetector (emerging cells: low current suitability + positive delta) | ✓ Complete |
-| LossZoneDetector (declining cells: high current suitability + negative delta) | ✓ Complete |
+| GainZoneDetector (emerging cells: low current suitability + positive delta; dynamic confidence tiers) | ✓ Complete |
+| LossZoneDetector (declining cells: high current suitability + negative delta; dynamic confidence tiers) | ✓ Complete |
 | TransitionRecommender (Jaccard envelope overlap across candidate crop profiles) | ✓ Complete |
 | LandsatSource (file-backed ImagerySource, OLS trend slope GeoTIFF) | ✓ Complete |
 | CLI (`groundshift run --crop --region --phase --source --imagery`) | ✓ Complete |
@@ -336,6 +338,8 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | REST API — GET /api/v1/regions, GET /api/v1/regions/{id} | ✓ Complete |
 | REST API — GET /api/v1/crops/{id}/emerging (pre-computed results, ?region= filter) | ✓ Complete |
 | Emerging zone export script (`scripts/export_emerging.py --crop --region`) | ✓ Complete |
-| REST API — runs, packages endpoints | Planned |
+| REST API — GET /api/v1/runs (?crop_id= and ?region_id= filters) | ✓ Complete |
+| MBTiles export script (`scripts/export_mbtiles.py` — CivTAK offline delivery, TMS y-flip) | ✓ Complete |
+| REST API — GET /api/v1/packages/{crop_id}/{region_id} | Planned |
 
 *Built with the belief that information equity is a precondition for climate adaptation justice.*
