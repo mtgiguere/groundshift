@@ -47,6 +47,7 @@ Additional crop profiles (wine grape, olive, wheat, cocoa, tea) are included in 
 - **Calibration anchor monitoring** — named reference zones (origin centers, production references, stress references) scored on every run; alerts fire when a documented high-suitability zone drops below threshold
 - **Satellite imagery divergence** — Sentinel-2 NDVI composites compared against the climate suitability score; the signed divergence surface shows where model and ground truth agree or disagree; add `--imagery sentinel2`
 - **CMIP6 suitability projection** — SSP2 and SSP5 scenarios, 2040 / 2060 / 2100 horizons; run with `--phase predict`
+- **Climate change delta surfaces** — signed per-cell suitability change (projected − current) per scenario and horizon; run with `--phase prescribe`
 - **Landsat historical trend detection** — multi-decade NDVI change detection, onset date estimation (planned)
 - **Opportunity zone identification** — emerging suitability zones with infrastructure and market-access scoring (planned)
 - **Plugin architecture** — extensible evidence layers (pest/disease, frost risk, groundwater, land tenure) drop in without touching core logic
@@ -144,6 +145,22 @@ groundshift run --crop coffee --region ethiopia --phase predict
 #   [ssp585 / 2040]    min=0.000  mean=0.039  max=0.991  viable=387 cells
 #   [ssp585 / 2060]    min=0.000  mean=0.027  max=0.951  viable=318 cells
 #   [ssp585 / 2100]    min=0.000  mean=0.011  max=0.823  viable=174 cells
+
+# Prescribe — compute delta surfaces (projected minus current) per scenario and horizon
+# (requires both WorldClim and CMIP6 data)
+groundshift run --crop coffee --region ethiopia --phase prescribe
+
+# Sample output:
+# Groundshift — Prescribe phase
+#   crop:    coffee
+#   region:  ethiopia
+#
+#   [ssp245 / 2040]    gaining= 214  losing= 441  mean_delta=-0.032
+#   [ssp245 / 2060]    gaining= 163  losing= 492  mean_delta=-0.040
+#   [ssp245 / 2100]    gaining= 118  losing= 537  mean_delta=-0.048
+#   [ssp585 / 2040]    gaining= 198  losing= 457  mean_delta=-0.034
+#   [ssp585 / 2060]    gaining= 131  losing= 524  mean_delta=-0.046
+#   [ssp585 / 2100]    gaining=  71  losing= 584  mean_delta=-0.062
 ```
 
 ### Run tests
@@ -239,7 +256,7 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe and Predict phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, and Sentinel-2 imagery divergence. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. The Prescribe phase (opportunity zones, transition recommendations) is next.
+Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, and Sentinel-2 imagery divergence. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces (projected − current suitability) per scenario and horizon, exposing gaining and losing zones. Opportunity zone detection and transition recommendations build on these delta surfaces and are next.
 
 | Component | Status |
 |---|---|
@@ -250,6 +267,8 @@ Active development. The Describe and Predict phases are complete and runnable en
 | DivergenceResult (climate vs. observed NDVI surface) | ✓ Complete |
 | PredictProjection (scenario + horizon_year + suitability) | ✓ Complete |
 | PredictResult (list of projections) | ✓ Complete |
+| ChangeProjection (scenario + horizon_year + delta DataArray) | ✓ Complete |
+| PrescribeResult (list of change projections) | ✓ Complete |
 | Plugin base class (GroundshiftPlugin ABC) | ✓ Complete |
 | Plugin registry | ✓ Complete |
 | Three-tier aggregator (existential / stress / custom, envelope as hard gate) | ✓ Complete |
@@ -268,6 +287,7 @@ Active development. The Describe and Predict phases are complete and runnable en
 | DescribePhaseRunner (climate + optional imagery, returns DescribeResult) | ✓ Complete |
 | CMIP6Source (scenario/horizon-aware ClimateDataSource) | ✓ Complete |
 | PredictPhaseRunner (SSP2/SSP5 × 2040/2060/2100, returns PredictResult) | ✓ Complete |
+| PrescribePhaseRunner (delta surfaces from DescribeResult + PredictResult) | ✓ Complete |
 | CLI (`groundshift run --crop --region --phase --source --imagery`) | ✓ Complete |
 | Raster utility (geodataframe_to_modifier) | ✓ Complete |
 | WorldClim download script | ✓ Complete |
