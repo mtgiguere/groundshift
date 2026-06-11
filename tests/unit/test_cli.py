@@ -7,6 +7,7 @@ import xarray as xr
 from groundshift.cli import build_arg_parser, run_describe, run_predict, run_prescribe
 from groundshift.models.describe_result import DescribeResult
 from groundshift.models.divergence_result import DivergenceResult
+from groundshift.models.loss_zone import LossZone, LossZoneResult
 from groundshift.models.opportunity_zone import OpportunityZone, OpportunityZoneResult
 from groundshift.models.predict_result import PredictProjection, PredictResult
 from groundshift.models.prescribe_result import ChangeProjection, PrescribeResult
@@ -56,6 +57,16 @@ def _fake_opportunity_zone_result() -> OpportunityZoneResult:
         zones=[
             OpportunityZone("ssp245", 2040, mask, "low"),
             OpportunityZone("ssp585", 2100, mask, "low"),
+        ]
+    )
+
+
+def _fake_loss_zone_result() -> LossZoneResult:
+    mask = xr.DataArray(np.array([[False, True], [False, True]]))
+    return LossZoneResult(
+        zones=[
+            LossZone("ssp245", 2040, mask, "low"),
+            LossZone("ssp585", 2100, mask, "low"),
         ]
     )
 
@@ -428,6 +439,39 @@ class TestRunPrescribe:
                     with patch(
                         "groundshift.cli.GainZoneDetector.detect",
                         return_value=_fake_opportunity_zone_result(),
+                    ):
+                        run_prescribe(self._args())
+        out = capsys.readouterr().out
+        assert "cells" in out
+
+    def test_loss_zones_header_printed(self, capsys):
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=_fake_describe_result()):
+            with patch(
+                "groundshift.cli.PredictPhaseRunner.run", return_value=_fake_predict_result()
+            ):
+                with patch(
+                    "groundshift.cli.PrescribePhaseRunner.run",
+                    return_value=_fake_prescribe_result(),
+                ):
+                    with patch(
+                        "groundshift.cli.LossZoneDetector.detect",
+                        return_value=_fake_loss_zone_result(),
+                    ):
+                        run_prescribe(self._args())
+        assert "loss" in capsys.readouterr().out.lower()
+
+    def test_loss_zones_cell_count_printed(self, capsys):
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=_fake_describe_result()):
+            with patch(
+                "groundshift.cli.PredictPhaseRunner.run", return_value=_fake_predict_result()
+            ):
+                with patch(
+                    "groundshift.cli.PrescribePhaseRunner.run",
+                    return_value=_fake_prescribe_result(),
+                ):
+                    with patch(
+                        "groundshift.cli.LossZoneDetector.detect",
+                        return_value=_fake_loss_zone_result(),
                     ):
                         run_prescribe(self._args())
         out = capsys.readouterr().out
