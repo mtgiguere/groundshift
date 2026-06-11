@@ -335,7 +335,7 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | REST API — GET /api/v1/crops, GET /api/v1/crops/{id} | ✓ Complete |
 | REST API — GET /api/v1/regions, GET /api/v1/regions/{id} | ✓ Complete |
 | REST API — GET /api/v1/crops/{id}/emerging (pre-computed results, ?region= filter) | ✓ Complete |
-| Emerging zone export script (writes results for API to serve) | Planned |
+| Emerging zone export script (`scripts/export_emerging.py --crop --region`) | ✓ Complete |
 | REST API — runs, packages endpoints | Planned |
 
 *Built with the belief that information equity is a precondition for climate adaptation justice.*

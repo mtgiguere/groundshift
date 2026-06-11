@@ -214,6 +214,7 @@ groundshift/
 │
 ├── scripts/
 │   ├── __init__.py
+│   ├── export_emerging.py               # ✓ runs prescribe pipeline, writes emerging zone JSON for API
 │   └── ingest/                          # One-time and scheduled ingestion
 │       ├── __init__.py
 │       ├── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
@@ -497,7 +498,11 @@ The REST API is the delivery boundary between pipeline artifacts and all clients
 | `GET /api/v1/runs/{run_id}/surfaces` | Planned | Suitability surfaces for a completed run |
 | `GET /api/v1/packages/{crop_id}/{region_id}` | Planned | Download pre-generated offline package |
 
-**Emerging zone result storage:** Pre-computed results are written to `data/results/emerging/{crop_id}_{region_id}.json` by the CLI pipeline. The `GET /api/v1/crops/{id}/emerging` endpoint reads those files at request time — no pipeline runs on request. An export script (`scripts/export_emerging.py`, planned) will automate writing these files after each prescribe run.
+**Emerging zone result storage:** Pre-computed results are written to `data/results/emerging/{crop_id}_{region_id}.json` by `scripts/export_emerging.py`. The `GET /api/v1/crops/{id}/emerging` endpoint reads those files at request time — no pipeline runs on request. Run the export script after any prescribe pipeline update to keep the API current:
+
+```bash
+python scripts/export_emerging.py --crop coffee --region ethiopia
+```
 
 All endpoints return GeoJSON by default. The `Accept` header or a `?format=` query parameter selects simplified GeoJSON (for mobile bandwidth) or full-resolution GeoJSON.
 
