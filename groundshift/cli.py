@@ -15,6 +15,7 @@ from groundshift.core.imagery.landsat_source import LandsatSource
 from groundshift.core.imagery.sentinel2_source import Sentinel2Source
 from groundshift.core.opportunity.gain_zone_detector import GainZoneDetector
 from groundshift.core.opportunity.loss_zone_detector import LossZoneDetector
+from groundshift.core.opportunity.transition_recommender import TransitionRecommender
 from groundshift.core.phases.describe import DescribePhaseRunner
 from groundshift.core.phases.predict import PredictPhaseRunner
 from groundshift.core.phases.prescribe import PrescribePhaseRunner
@@ -22,6 +23,7 @@ from groundshift.models.time_range import TimeRange
 from groundshift.plugins.registry import PluginRegistry
 from groundshift.regions.resolver import UnknownRegionError, resolve_region
 
+_PROFILES_DIR = Path(__file__).parents[1] / "crop_profiles"
 _WORLDCLIM_DIR = Path(__file__).parents[1] / "data" / "worldclim" / "10m"
 _ERA5_DIR = Path(__file__).parents[1] / "data" / "era5"
 _SENTINEL2_DIR = Path(__file__).parents[1] / "data" / "sentinel2"
@@ -224,6 +226,13 @@ def run_prescribe(args: argparse.Namespace) -> None:
     opportunity = GainZoneDetector().detect(describe_result, result)
     loss = LossZoneDetector().detect(describe_result, result)
 
+    candidates = [
+        load_profile_from_yaml(p)
+        for p in sorted(_PROFILES_DIR.glob("*.yaml"))
+        if p.stem != args.crop
+    ]
+    transition = TransitionRecommender(candidates).recommend(profile)
+
     print("Groundshift — Prescribe phase")
     print(f"  crop:    {args.crop}")
     print(f"  region:  {args.region}")
@@ -256,6 +265,11 @@ def run_prescribe(args: argparse.Namespace) -> None:
         cell_count = int(zone.mask.values.sum())
         label = f"[{zone.scenario} / {zone.horizon_year}]"
         print(f"  {label:<18}  {cell_count:>4} cells  confidence={zone.confidence}")
+
+    print()
+    print("  transition suggestions (crops with most similar climate envelopes):")
+    for i, s in enumerate(transition.suggestions, 1):
+        print(f"    {i}. {s.crop_name:<20}  overlap={s.overlap_score:.2f}")
 
 
 def main() -> None:
