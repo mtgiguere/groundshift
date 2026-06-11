@@ -203,7 +203,7 @@ def test_imagery_sentinel2_is_accepted():
             "sentinel2",
         ]
     )
-    assert args.imagery == "sentinel2"
+    assert args.imagery == ["sentinel2"]
 
 
 def test_imagery_landsat_is_accepted():
@@ -221,7 +221,26 @@ def test_imagery_landsat_is_accepted():
             "landsat",
         ]
     )
-    assert args.imagery == "landsat"
+    assert args.imagery == ["landsat"]
+
+
+def test_imagery_both_values_accepted():
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "run",
+            "--crop",
+            "coffee",
+            "--region",
+            "ethiopia",
+            "--phase",
+            "describe",
+            "--imagery",
+            "sentinel2",
+            "landsat",
+        ]
+    )
+    assert set(args.imagery) == {"sentinel2", "landsat"}
 
 
 def test_imagery_invalid_exits_with_error():
@@ -261,7 +280,7 @@ class TestRunDescribe:
             source,
         ]
         if imagery:
-            argv += ["--imagery", imagery]
+            argv += ["--imagery"] + (imagery if isinstance(imagery, list) else [imagery])
         return build_arg_parser().parse_args(argv)
 
     def test_unknown_region_raises_system_exit(self):
@@ -313,8 +332,24 @@ class TestRunDescribe:
         result.trend = TrendResult(slope=slope)
         with patch("groundshift.cli.DescribePhaseRunner.run", return_value=result):
             with patch("groundshift.cli.load_anchors_from_profile", return_value=[]):
-                run_describe(self._args(imagery="landsat"))
+                run_describe(self._args(imagery=["landsat"]))
         assert "trend" in capsys.readouterr().out.lower()
+
+    def test_both_imagery_sources_print_divergence_and_trend(self, capsys):
+        from groundshift.models.divergence_result import DivergenceResult
+        from groundshift.models.trend_result import TrendResult
+
+        result = _fake_describe_result()
+        result.divergence = DivergenceResult(
+            surface=xr.DataArray(np.array([[0.1, -0.2], [0.3, -0.1]]))
+        )
+        result.trend = TrendResult(slope=xr.DataArray(np.array([[-0.002, 0.001], [0.003, -0.001]])))
+        with patch("groundshift.cli.DescribePhaseRunner.run", return_value=result):
+            with patch("groundshift.cli.load_anchors_from_profile", return_value=[]):
+                run_describe(self._args(imagery=["sentinel2", "landsat"]))
+        out = capsys.readouterr().out
+        assert "divergence" in out.lower()
+        assert "trend" in out.lower()
 
 
 # ---------------------------------------------------------------------------
