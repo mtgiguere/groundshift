@@ -69,14 +69,14 @@ def run_describe(args: argparse.Namespace) -> None:
         raise SystemExit(f"Crop profile not found: {profile_path}")
 
     profile = load_profile_from_yaml(profile_path)
-    if getattr(args, "source", "worldclim") == "era5":
+    if args.source == "era5":
         source = ERA5Source(_ERA5_DIR)
         time_range = _ERA5_TIME_RANGE
     else:
         source = WorldClimSource(_WORLDCLIM_DIR)
         time_range = _WORLDCLIM_TIME_RANGE
     imagery_source = None
-    if getattr(args, "imagery", None) == "sentinel2":
+    if args.imagery == "sentinel2":
         imagery_source = Sentinel2Source(_SENTINEL2_DIR)
     runner = DescribePhaseRunner(source, PluginRegistry(), imagery_source=imagery_source)
     result = runner.run(profile, region, time_range)
