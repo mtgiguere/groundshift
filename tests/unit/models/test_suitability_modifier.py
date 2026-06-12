@@ -67,3 +67,17 @@ def test_suitability_modifier_raises_if_confidence_below_0():
 def test_suitability_modifier_accepts_boundary_factor_values(factor_value):
     m = _make_modifier(factor_value=_da(factor_value))
     assert float(m.factor_value.mean()) == pytest.approx(factor_value)
+
+
+def test_suitability_modifier_raises_if_mixed_array_has_negative_min():
+    # Array where min < 0 but max >= 0 — validates that .min() is checked, not just .max()
+    mixed = xr.DataArray(np.array([-0.1, 0.5]))
+    with pytest.raises(ValueError, match="factor_value"):
+        _make_modifier(factor_value=mixed)
+
+
+def test_suitability_modifier_raises_if_mixed_array_has_max_above_1():
+    # Array where max > 1 but min <= 1 — validates that .max() is checked, not just .min()
+    mixed = xr.DataArray(np.array([0.5, 1.1]))
+    with pytest.raises(ValueError, match="factor_value"):
+        _make_modifier(factor_value=mixed)
