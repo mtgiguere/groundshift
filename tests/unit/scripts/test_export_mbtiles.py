@@ -83,6 +83,20 @@ class TestMaskToRgba:
         rgba = _mask_to_rgba(mask, 50, 50, 60, 60, color=(0, 200, 100, 180))
         assert rgba.sum() == 0
 
+    def test_tile_west_of_mask_returns_transparent(self):
+        # Mask lons are 0..20 (min=0). True cell is in leftmost lon column (lon=0).
+        # Tile is west of mask: east=-5 < lon_vals.min()=0.
+        # With the lat/lon mixup bug: east(-5) < lat_vals.min()(-10) is False →
+        # bounds check doesn't fire → pixels at lons [-20,-5] map to nearest lon=0
+        # → True cell renders → rgba.sum() > 0. Correct code returns transparent.
+        lats = np.linspace(10, -10, 4)
+        lons = np.linspace(0, 20, 4)
+        data = np.zeros((4, 4), dtype=float)
+        data[1, 0] = 1.0  # True cell at leftmost lon
+        mask = xr.DataArray(data, coords={"lat": lats, "lon": lons}, dims=["lat", "lon"])
+        rgba = _mask_to_rgba(mask, -20, -5, -5, 5, color=(0, 200, 100, 180))
+        assert rgba.sum() == 0
+
     def test_all_false_mask_returns_transparent(self):
         lats = np.linspace(10, -10, 4)
         lons = np.linspace(-20, 20, 8)
