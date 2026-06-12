@@ -22,6 +22,11 @@ climate_envelope:
       optimal_max: 2000.0
       viable_max: 3000.0
 
+frost_threshold_c: 0.0
+precip_viable_min_mm: 1200.0
+precip_optimal_min_mm: 1500.0
+heat_max_threshold_c: 30.0
+
 calibration_anchors:
   - id: yirgacheffe_sidama
     name: Yirgacheffe / Sidama
