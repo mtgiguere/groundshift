@@ -731,9 +731,10 @@ The divergence surface is the most scientifically valuable output of the Describ
 class DescribeResult:
     suitability: SuitabilityResult
     divergence: DivergenceResult | None  # None when no imagery source is provided
+    trend: TrendResult | None            # None when no Landsat source is provided
 ```
 
-The runner accepts `imagery_source: ImagerySource | None = None`. When absent, divergence is `None` and the output is identical to a pure climate-envelope run.
+The runner accepts `imagery_source: ImagerySource | None = None`. When absent, both `divergence` and `trend` are `None` and the output is identical to a pure climate-envelope run.
 
 ---
 
