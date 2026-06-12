@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Target files → their paired test files
+# Target files -> their paired test files
 # ---------------------------------------------------------------------------
 
 _TARGETS: dict[Path, Path] = {
@@ -89,9 +89,18 @@ def collect_mutations(path: Path) -> list[Mutation]:
     """Return all operator-flip mutation candidates for a source file."""
     lines = path.read_text(encoding="utf-8").splitlines()
     mutations: list[Mutation] = []
+    in_docstring = False
     for i, line in enumerate(lines, start=1):
         stripped = line.lstrip()
         if stripped.startswith("#"):
+            continue
+        # Toggle docstring state on lines with an odd number of triple-quotes.
+        # Each such line is itself a delimiter — skip it regardless of state.
+        for quote in ('"""', "'''"):
+            if line.count(quote) % 2 == 1:
+                in_docstring = not in_docstring
+                break
+        if in_docstring or '"""' in line or "'''" in line:
             continue
         for find, replace in _OP_MUTATIONS:
             if find in line:
@@ -103,7 +112,7 @@ def collect_mutations(path: Path) -> list[Mutation]:
                         line=i,
                         original=line,
                         mutant=mutant,
-                        description=f"{op_name} → {replace.strip()} at line {i}",
+                        description=f"{op_name} -> {replace.strip()} at line {i}",
                     )
                 )
     return mutations
@@ -166,7 +175,7 @@ def run_audit(sample: int = 50, seed: int | None = None) -> None:
             mutation.file.write_text(original, encoding="utf-8")
         print(
             f"  [{i:2d}/{len(sampled)}] {mutation.file.name}:{mutation.line} "
-            f"{mutation.description} → {status}"
+            f"{mutation.description} -> {status}"
         )
 
     print(f"\n{'=' * 60}")

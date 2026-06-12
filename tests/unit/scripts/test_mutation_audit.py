@@ -64,6 +64,21 @@ class TestCollectMutations:
         src = _write(tmp_path, "m.py", "# if x < 0: do something\nx = 1\n")
         assert collect_mutations(src) == []
 
+    def test_skips_and_inside_docstring(self, tmp_path):
+        src = _write(tmp_path, "m.py", 'def f():\n    """Do this and that."""\n    pass\n')
+        assert collect_mutations(src) == []
+
+    def test_skips_multiline_docstring_content(self, tmp_path):
+        content = 'def f():\n    """First line.\n\n    Uses x and y.\n    """\n    pass\n'
+        src = _write(tmp_path, "m.py", content)
+        assert collect_mutations(src) == []
+
+    def test_does_not_skip_and_after_docstring(self, tmp_path):
+        content = 'def f():\n    """Docstring."""\n    if a and b:\n        pass\n'
+        src = _write(tmp_path, "m.py", content)
+        mutations = collect_mutations(src)
+        assert any("and" in m.description for m in mutations)
+
     def test_multiple_operators_on_same_line(self, tmp_path):
         src = _write(tmp_path, "m.py", "if x < 0 and y > 1:\n    pass\n")
         mutations = collect_mutations(src)
