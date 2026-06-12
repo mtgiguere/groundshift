@@ -119,21 +119,25 @@ groundshift/
 │   │       └── raster.py                # ✓ geodataframe_to_modifier — rasterize GeoDataFrame to SuitabilityModifier
 │   │
 │   ├── api/
-│   │   ├── app.py                       # ✓ create_app(profiles_dir, results_dir) — FastAPI factory, testable
+│   │   ├── app.py                       # ✓ create_app(profiles_dir, results_dir, plugin_data_dir) — FastAPI factory, testable
 │   │   └── routes/
 │   │       ├── crops.py                 # ✓ GET /api/v1/crops, GET /api/v1/crops/{id}
 │   │       ├── regions.py               # ✓ GET /api/v1/regions, GET /api/v1/regions/{id}
 │   │       ├── emerging.py              # ✓ GET /api/v1/crops/{id}/emerging — serves pre-computed JSON results
 │   │       ├── runs.py                  # ✓ GET /api/v1/runs — lists results, filterable by crop_id / region_id
-│   │       └── packages.py              # ✓ GET /api/v1/packages, GET /api/v1/packages/{crop}/{region} — streams MBTiles
-│   │       └── transitions.py           # ✓ GET /api/v1/crops/{id}/transitions — Jaccard envelope ranking
+│   │       ├── packages.py              # ✓ GET /api/v1/packages, GET /api/v1/packages/{crop}/{region} — streams MBTiles
+│   │       ├── transitions.py           # ✓ GET /api/v1/crops/{id}/transitions — Jaccard envelope ranking
+│   │       └── plugins.py               # ✓ GET /api/v1/plugins — lists all plugins with available/unavailable status
 │   │
 │   ├── plugins/
 │   │   ├── base.py                      # ✓ GroundshiftPlugin ABC (5-method contract)
 │   │   ├── registry.py                  # ✓ register, get, list_plugins; duplicate guard
-│   │   └── stretch/                     # Modifier plugins (operate inside the envelope gate)
+│   │   ├── auto_registry.py             # ✓ build_plugin_registry(plugin_data_dir) — globs for data files, registers present plugins
+│   │   ├── frost_risk.py                # ✓ FrostRiskPlugin — existential tier; CMIP6 min-temp → annual frost probability
+│   │   ├── drought_stress.py            # ✓ DroughtStressPlugin — stress tier; CMIP6 precipitation → drought probability
+│   │   ├── heat_stress.py               # ✓ HeatStressPlugin — stress tier; CMIP6 mean-temp → heat damage probability
+│   │   └── stretch/                     # Future modifier plugins
 │   │       ├── pest_disease/            # Planned
-│   │       ├── frost_risk/              # Planned
 │   │       ├── groundwater/             # Planned
 │   │       ├── phenology/               # Planned
 │   │       ├── land_tenure/             # Planned
@@ -186,15 +190,15 @@ groundshift/
 │   │   ├── core/
 │   │   │   ├── envelope/                # ✓ test_threshold, test_envelope_scorer, test_profile_loader, test_climate_envelope, test_worldclim_source
 │   │   │   ├── phases/                  # ✓ test_describe_phase_runner, test_predict_phase_runner, test_prescribe_phase_runner
-│   │   │   ├── opportunity/             # ✓ test_gain_zone_detector
+│   │   │   ├── opportunity/             # ✓ test_gain_zone_detector, test_loss_zone_detector
 │   │   │   ├── utils/                   # ✓ test_raster
 │   │   │   ├── test_aggregator.py       # ✓ three-tier logic, probability/expected value, property tests
 │   │   │   └── test_scorer.py           # ✓
 │   │   ├── models/                      # ✓ all models covered
-│   │   ├── plugins/                     # ✓ test_plugin_base.py, test_registry.py
+│   │   ├── plugins/                     # ✓ test_plugin_base, test_registry, test_frost_risk_plugin, test_drought_stress_plugin, test_heat_stress_plugin, test_auto_registry, test_profile_plugin_compatibility
 │   │   ├── regions/                     # ✓ test_resolver.py
-│   │   ├── api/                         # ✓ test_crops (status codes, response shape, 404, threshold structure)
-│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5, test_download_sentinel2, test_download_cmip6, test_download_landsat
+│   │   ├── api/                         # ✓ test_crops, test_regions, test_emerging, test_runs, test_packages, test_transitions, test_plugins
+│   │   ├── scripts/                     # ✓ test_download_worldclim, test_download_era5, test_download_sentinel2, test_download_cmip6, test_download_landsat, test_download_cmip6_tasmin, test_prepare_plugin_data, test_mutation_audit
 │   │   └── test_cli.py                  # ✓ argument parsing, run_describe, run_predict, run_prescribe, --source, --imagery
 │   ├── integration/
 │   │   └── test_describe_phase_smoke.py # ✓ WorldClim + ERA5 + Sentinel-2 + Landsat smoke tests (skip if data absent)
@@ -211,20 +215,24 @@ groundshift/
 │   ├── era5/                            # ERA5 NetCDF files (downloaded by ingest script, gitignored)
 │   ├── sentinel2/                       # Sentinel-2 NDVI GeoTIFFs (downloaded by ingest script, gitignored)
 │   ├── landsat/                         # Landsat NDVI trend GeoTIFFs (downloaded by ingest script, gitignored)
-│   └── cmip6/                           # CMIP6 projection NetCDFs (downloaded by ingest script, gitignored)
+│   ├── cmip6/                           # CMIP6 projection NetCDFs (downloaded by ingest script, gitignored)
+│   └── plugin_data/                     # Pre-processed plugin NetCDFs (gitignored); naming: {plugin_id}_{variable}_{scenario}_{horizon}.nc
 │
 ├── scripts/
 │   ├── __init__.py
 │   ├── export_emerging.py               # ✓ runs prescribe pipeline, writes emerging zone JSON for API
 │   ├── export_mbtiles.py                # ✓ converts zone mask (xr.DataArray) to MBTiles for CivTAK offline
-│   ├── export_kmz.py                   # ✓ converts zone mask to KMZ (ZIP/KML) for CivTAK polygon overlays
+│   ├── export_kmz.py                    # ✓ converts zone mask to KMZ (ZIP/KML) for CivTAK polygon overlays
+│   ├── prepare_plugin_data.py           # ✓ derives drought_stress and heat_stress NetCDFs from raw CMIP6 files
+│   ├── mutation_audit.py                # ✓ random-sample operator-flip mutation tester (47 candidates, 11 target files)
 │   └── ingest/                          # One-time and scheduled ingestion
 │       ├── __init__.py
 │       ├── download_worldclim.py        # ✓ downloads WorldClim v2.1 base data to data/worldclim/10m/
 │       ├── download_era5.py             # ✓ downloads ERA5 reanalysis to data/era5/ (requires cdsapi)
 │       ├── download_sentinel2.py        # ✓ downloads Sentinel-2 NDVI composite via AWS Earth Search (free)
 │       ├── download_cmip6.py            # ✓ downloads CMIP6 projections via Pangeo/Google Cloud (free)
-│       └── download_landsat.py          # ✓ downloads Landsat C2 L2 via AWS Earth Search, computes OLS trend (free)
+│       ├── download_landsat.py          # ✓ downloads Landsat C2 L2 via AWS Earth Search, computes OLS trend (free)
+│       └── download_cmip6_tasmin.py     # ✓ downloads CMIP6 tasmin (min temp), K→°C, annual min, writes frost_risk_min_temp_*.nc
 │
 ├── infrastructure/
 │   └── aws/                             # Lambda, S3, RDS terraform/CDK
@@ -502,6 +510,7 @@ The REST API is the delivery boundary between pipeline artifacts and all clients
 | `GET /api/v1/packages` | ✓ Live | List available MBTiles packages; `?crop_id=` and `?region_id=` filters |
 | `GET /api/v1/packages/{crop_id}/{region_id}` | ✓ Live | Download pre-generated MBTiles as `application/octet-stream` |
 | `GET /api/v1/crops/{id}/transitions` | ✓ Live | Ranked alternative crop suggestions by Jaccard envelope overlap |
+| `GET /api/v1/plugins` | ✓ Live | List all known plugins; `status: available` when data files present, `unavailable` otherwise |
 | `GET /api/v1/runs/{run_id}/surfaces` | Planned | Suitability surfaces for a completed run |
 
 **Emerging zone result storage:** Pre-computed results are written to `data/results/emerging/{crop_id}_{region_id}.json` by `scripts/export_emerging.py`. The `GET /api/v1/crops/{id}/emerging` endpoint reads those files at request time — no pipeline runs on request. Run the export script after any prescribe pipeline update to keep the API current:
@@ -732,6 +741,39 @@ The runner accepts `imagery_source: ImagerySource | None = None`. When absent, d
 
 See [PLUGIN.md](PLUGIN.md) for the full plugin development guide.
 
+### Shipped Plugins
+
+Three climate threat plugins are currently shipped. All require pre-processed NetCDF files in `data/plugin_data/` (see `scripts/prepare_plugin_data.py` and `scripts/ingest/download_cmip6_tasmin.py`).
+
+| Plugin | Tier | Data file pattern | Crop profile keys required |
+|---|---|---|---|
+| `FrostRiskPlugin` | existential | `frost_risk_min_temp_{scenario}_{horizon}.nc` | `frost_threshold_c` (default `0.0`) |
+| `DroughtStressPlugin` | stress | `drought_stress_precip_{scenario}_{horizon}.nc` | `precip_viable_min_mm`, `precip_optimal_min_mm` |
+| `HeatStressPlugin` | stress | `heat_stress_mean_temp_{scenario}_{horizon}.nc` | `heat_max_threshold_c` |
+
+**Scoring formulas:**
+
+- Frost: `probability = ((threshold − min_temp) / 2.0).clip(0, 1)`, `factor_value = 0.0` (frost kills crop)
+- Drought: `probability = ((optimal_min − precip) / (optimal_min − viable_min)).clip(0, 1)`, `factor_value = 1 − probability`
+- Heat: `probability = ((mean_temp − threshold) / 5.0).clip(0, 1)`, `factor_value = 1 − probability`
+
+**Crop profile threshold keys** live at the top level of each YAML file (not nested). All shipped profiles include these keys. Plugins whose required keys are missing from a profile skip that run via `validate_config` returning `False` — `FrostRiskPlugin` always returns `True`.
+
+### Auto-Registration
+
+Plugins register themselves automatically. `build_plugin_registry(plugin_data_dir)` in `auto_registry.py` globs for each plugin's sentinel file pattern and registers only the plugins whose data files are present:
+
+```python
+from groundshift.plugins.auto_registry import build_plugin_registry
+
+registry = build_plugin_registry(Path("data/plugin_data"))
+# → FrostRiskPlugin registered if frost_risk_min_temp_*.nc exists
+# → DroughtStressPlugin registered if drought_stress_precip_*.nc exists
+# → HeatStressPlugin registered if heat_stress_mean_temp_*.nc exists
+```
+
+All CLI phase runners and `create_app()` call `build_plugin_registry(_PLUGIN_DATA_DIR)` automatically — no configuration change is needed to activate a plugin once its data files land in `data/plugin_data/`.
+
 ### Plugin Interface Contract
 
 ```python
@@ -914,6 +956,7 @@ GROUNDSHIFT_API_PORT=8000
 | Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source + LandsatSource, DescribePhaseRunner, calibration anchor monitoring, NDVI divergence surface, Landsat historical trend surface, CLI `groundshift run --phase describe --source --imagery`. | ✓ Functional |
 | Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. | ✓ Functional |
 | Phase 3 — Prescribe | Delta surfaces, opportunity zone detection, loss zone detection, and transition recommendations complete. `PrescribePhaseRunner` + `GainZoneDetector` + `LossZoneDetector` + `TransitionRecommender`; CLI prints gaining/losing cells, opportunity zone counts, loss zone counts, and ranked transition suggestions per scenario+horizon. Cooperative infrastructure context is next. | ✓ Mostly functional |
-| API + delivery | All core endpoints live: crops, regions, emerging, runs, packages (MBTiles download), transitions. Both offline formats complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). | ✓ Functional |
-| Plugin expansion | Frost risk, pest/disease, phenology plugins | Planned |
+| API + delivery | All core endpoints live: crops, regions, emerging, runs, packages (MBTiles download), transitions, plugins. Both offline formats complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). | ✓ Functional |
+| Climate threat plugins | FrostRiskPlugin (existential), DroughtStressPlugin (stress), HeatStressPlugin (stress) shipped. Auto-registration via `build_plugin_registry`. Ingest scripts for all three data pipelines complete. | ✓ Functional |
+| Additional plugins | Pest/disease, phenology, groundwater, land tenure, cooperative infrastructure | Planned |
 | Additional crops | Wine grape, olive, wheat profiles production-ready | Planned |
