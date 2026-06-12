@@ -20,7 +20,7 @@ from groundshift.core.phases.describe import DescribePhaseRunner
 from groundshift.core.phases.predict import PredictPhaseRunner
 from groundshift.core.phases.prescribe import PrescribePhaseRunner
 from groundshift.models.time_range import TimeRange
-from groundshift.plugins.registry import PluginRegistry
+from groundshift.plugins.auto_registry import build_plugin_registry
 from groundshift.regions.resolver import UnknownRegionError, resolve_region
 
 _PROFILES_DIR = Path(__file__).parents[1] / "crop_profiles"
@@ -29,6 +29,7 @@ _ERA5_DIR = Path(__file__).parents[1] / "data" / "era5"
 _SENTINEL2_DIR = Path(__file__).parents[1] / "data" / "sentinel2"
 _LANDSAT_DIR = Path(__file__).parents[1] / "data" / "landsat"
 _CMIP6_DIR = Path(__file__).parents[1] / "data" / "cmip6"
+_PLUGIN_DATA_DIR = Path(__file__).parents[1] / "data" / "plugin_data"
 
 _WORLDCLIM_TIME_RANGE = TimeRange(start=datetime(1970, 1, 1), end=datetime(2000, 12, 31))
 _ERA5_TIME_RANGE = TimeRange(start=datetime(2015, 1, 1), end=datetime(2024, 12, 31))
@@ -94,7 +95,10 @@ def run_describe(args: argparse.Namespace) -> None:
     imagery_source = Sentinel2Source(_SENTINEL2_DIR) if "sentinel2" in active_imagery else None
     landsat_source = LandsatSource(_LANDSAT_DIR) if "landsat" in active_imagery else None
     runner = DescribePhaseRunner(
-        source, PluginRegistry(), imagery_source=imagery_source, landsat_source=landsat_source
+        source,
+        build_plugin_registry(_PLUGIN_DATA_DIR),
+        imagery_source=imagery_source,
+        landsat_source=landsat_source,
     )
     result = runner.run(profile, region, time_range)
 
@@ -162,7 +166,10 @@ def run_predict(args: argparse.Namespace) -> None:
     profile = load_profile_from_yaml(profile_path)
     source = CMIP6Source(_CMIP6_DIR)
     runner = PredictPhaseRunner(
-        source, PluginRegistry(), scenarios=_CMIP6_SCENARIOS, horizons=_CMIP6_HORIZONS
+        source,
+        build_plugin_registry(_PLUGIN_DATA_DIR),
+        scenarios=_CMIP6_SCENARIOS,
+        horizons=_CMIP6_HORIZONS,
     )
 
     try:
@@ -206,11 +213,11 @@ def run_prescribe(args: argparse.Namespace) -> None:
 
     try:
         describe_result = DescribePhaseRunner(
-            WorldClimSource(_WORLDCLIM_DIR), PluginRegistry()
+            WorldClimSource(_WORLDCLIM_DIR), build_plugin_registry(_PLUGIN_DATA_DIR)
         ).run(profile, region, _WORLDCLIM_TIME_RANGE)
         predict_result = PredictPhaseRunner(
             CMIP6Source(_CMIP6_DIR),
-            PluginRegistry(),
+            build_plugin_registry(_PLUGIN_DATA_DIR),
             scenarios=_CMIP6_SCENARIOS,
             horizons=_CMIP6_HORIZONS,
         ).run(profile, region, _CMIP6_TIME_RANGE)
