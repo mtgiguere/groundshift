@@ -214,11 +214,9 @@ Groundshift ships with the following crop profiles. Each profile defines the com
 | Crop | Status | Calibration anchors |
 |---|---|---|
 | Arabica coffee | Active | Yirgacheffe/Sidama (origin), Colombia Huila (production), Central America Pacific (stress) |
-| Wine grape | Profile included | — |
-| Olive | Profile included | — |
-| Wheat | Profile included | — |
-| Cocoa | Profile stub | — |
-| Tea | Profile stub | — |
+| Tea | Active | Darjeeling (origin), Kenya Highlands Kericho (production), Assam Brahmaputra (stress) |
+| Cacao | Active | Côte d'Ivoire Southwest (origin), Ghana Ashanti (production), Central Sulawesi (stress) |
+| Maize | Active | Iowa Corn Belt (origin), Ethiopia Jimma/Wolega (production), NE Brazil Nordeste (stress) |
 
 Adding a new crop requires only a YAML profile. See [PLUGIN.md](docs/PLUGIN.md) for the crop profile specification.
 
@@ -228,9 +226,15 @@ Adding a new crop requires only a YAML profile. See [PLUGIN.md](docs/PLUGIN.md) 
 
 Groundshift is designed for extensibility. Evidence layers beyond the core climate envelope are implemented as plugins that drop into the pipeline without modifying core logic.
 
-**Stretch plugins (interfaces defined, implementations planned):**
+**Shipped climate threat plugins:**
+- `frost_risk` — CMIP6 minimum temperature → annual frost probability (existential tier)
+- `drought_stress` — CMIP6 precipitation → drought stress probability (stress tier)
+- `heat_stress` — CMIP6 mean temperature → heat damage probability (stress tier)
+
+Plugins activate automatically when their data files exist in `data/plugin_data/`. No configuration change needed — run the ingest scripts and they fire on the next analysis.
+
+**Planned plugins:**
 - `pest_disease` — Coffee leaf rust, grapevine downy mildew, wheat blast range expansion
-- `frost_risk` — Daily temperature extremes, late frost event modeling
 - `groundwater` — GRACE aquifer depletion surfaces
 - `phenology` — MODIS/Sentinel flowering and harvest timing shifts
 - `land_tenure` — Ownership type context for prescribe-phase recommendations
@@ -239,6 +243,10 @@ Groundshift is designed for extensibility. Evidence layers beyond the core clima
 See [PLUGIN.md](docs/PLUGIN.md) for complete plugin development documentation.
 
 ---
+
+## Usage Guide
+
+See [USAGE.md](docs/USAGE.md) for step-by-step instructions — both a plain-language section for cooperative and smallholder partners, and a technical section for field agronomists and NGO staff covering installation, data download, all three phases, the API, and offline package generation.
 
 ## Architecture
 
@@ -290,7 +298,7 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces, detects opportunity and loss zones with dynamic confidence tiers (low/medium/high based on signal agreement across CMIP6, Landsat, and Sentinel-2), and ranks alternative crops by climate envelope overlap. The REST API covers crops, regions, emerging zones, runs, packages (MBTiles download), and transition recommendations. Both offline delivery formats for CivTAK are complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). First plugin implementation is next.
+Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces, detects opportunity and loss zones with dynamic confidence tiers (low/medium/high based on signal agreement across CMIP6, Landsat, and Sentinel-2), and ranks alternative crops by climate envelope overlap. The REST API covers crops, regions, emerging zones, runs, packages (MBTiles download), transition recommendations, and plugin availability. Both offline delivery formats for CivTAK are complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). Three climate threat plugins are shipped (frost risk, drought stress, heat stress) and auto-register when their CMIP6-derived data files are present. Four crop profiles active: coffee, tea, cacao, maize.
 
 | Component | Status |
 |---|---|
