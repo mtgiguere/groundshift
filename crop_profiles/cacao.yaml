@@ -1,0 +1,47 @@
+crop_id: cacao
+name: Cacao
+scientific_name: Theobroma cacao
+
+climate_envelope:
+  thresholds:
+    mean_annual_temp_c:
+      viable_min: 18.0
+      optimal_min: 20.0
+      optimal_max: 28.0
+      viable_max: 34.0
+
+    annual_precipitation_mm:
+      viable_min: 1250.0
+      optimal_min: 1500.0
+      optimal_max: 2500.0
+      viable_max: 3000.0
+
+    altitude_m:
+      viable_min: 0.0
+      optimal_min: 0.0
+      optimal_max: 600.0
+      viable_max: 900.0
+
+frost_threshold_c: 15.0
+precip_viable_min_mm: 1250.0
+precip_optimal_min_mm: 1500.0
+heat_max_threshold_c: 32.0
+
+calibration_anchors:
+  - id: cote_divoire_southwest
+    name: Côte d'Ivoire — Southwest Belt
+    role: origin_center
+    bbox: [-7.5, 5.0, -5.0, 7.0]
+    notes: "World's largest cacao producing zone. Benchmark origin. Declining score here reflects a global supply chain risk."
+
+  - id: ghana_ashanti
+    name: Ghana — Ashanti / Brong-Ahafo Belt
+    role: production_reference
+    bbox: [-3.0, 5.5, -1.0, 7.5]
+    notes: "Premium fine-flavor cacao. Active export at scale. Critical smallholder livelihood zone."
+
+  - id: sulawesi_dry_season
+    name: Central Sulawesi — Palu Valley
+    role: stress_reference
+    bbox: [120.0, -2.5, 122.5, 0.0]
+    notes: "Extended dry season and El Niño drought stress documented. High scores here indicate the model is missing real-world yield volatility."

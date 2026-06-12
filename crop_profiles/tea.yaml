@@ -1,0 +1,47 @@
+crop_id: tea
+name: Tea
+scientific_name: Camellia sinensis
+
+climate_envelope:
+  thresholds:
+    mean_annual_temp_c:
+      viable_min: 10.0
+      optimal_min: 14.0
+      optimal_max: 25.0
+      viable_max: 32.0
+
+    annual_precipitation_mm:
+      viable_min: 1150.0
+      optimal_min: 1500.0
+      optimal_max: 2500.0
+      viable_max: 3000.0
+
+    altitude_m:
+      viable_min: 0.0
+      optimal_min: 600.0
+      optimal_max: 2000.0
+      viable_max: 2700.0
+
+frost_threshold_c: 0.0
+precip_viable_min_mm: 1150.0
+precip_optimal_min_mm: 1500.0
+heat_max_threshold_c: 32.0
+
+calibration_anchors:
+  - id: darjeeling
+    name: Darjeeling
+    role: origin_center
+    bbox: [87.8, 26.5, 88.7, 27.4]
+    notes: "World benchmark for high-altitude first-flush tea. Declining score here is a critical signal."
+
+  - id: kenya_highlands_kericho
+    name: Kenya Highlands — Kericho / Nandi
+    role: production_reference
+    bbox: [34.8, -0.3, 35.8, 0.5]
+    notes: "Largest black tea export zone in Africa. 1500–2200m altitude, consistent rainfall."
+
+  - id: assam_brahmaputra
+    name: Assam — Brahmaputra Valley
+    role: stress_reference
+    bbox: [93.5, 25.5, 95.5, 27.5]
+    notes: "Heat and moisture stress documented. Yields increasingly variable. High scores here indicate the model is underestimating thermal stress."
