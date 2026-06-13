@@ -1,0 +1,47 @@
+crop_id: wine_grape
+name: Wine Grape
+scientific_name: Vitis vinifera
+
+climate_envelope:
+  thresholds:
+    mean_annual_temp_c:
+      viable_min: 10.0
+      optimal_min: 14.0
+      optimal_max: 20.0
+      viable_max: 25.0
+
+    annual_precipitation_mm:
+      viable_min: 300.0
+      optimal_min: 500.0
+      optimal_max: 800.0
+      viable_max: 1000.0
+
+    altitude_m:
+      viable_min: 0.0
+      optimal_min: 50.0
+      optimal_max: 1200.0
+      viable_max: 1500.0
+
+frost_threshold_c: -2.0
+precip_viable_min_mm: 300.0
+precip_optimal_min_mm: 500.0
+heat_max_threshold_c: 35.0
+
+calibration_anchors:
+  - id: bordeaux
+    name: Bordeaux — Médoc / Saint-Émilion
+    role: origin_center
+    bbox: [-1.2, 44.5, -0.2, 45.2]
+    notes: "Global benchmark for premium viticulture. Stable maritime climate. Declining scores here are a leading indicator of premium wine region contraction in Western Europe."
+
+  - id: mendoza_argentina
+    name: Mendoza — Luján de Cuyo / Valle de Uco
+    role: production_reference
+    bbox: [-70.0, -34.5, -68.0, -32.0]
+    notes: "Southern Hemisphere benchmark. High-altitude continental climate. Major export production zone at 700–1500m elevation."
+
+  - id: guadalquivir_lowlands
+    name: Guadalquivir Lowlands — Andalucía
+    role: stress_reference
+    bbox: [-5.5, 36.5, -3.5, 38.5]
+    notes: "Documented heat and drought stress increasing through the 2010s–2020s. Low-elevation zone in southern Spain where summer temperatures routinely exceed 35°C. High scores here indicate the model is underestimating thermal and water stress."

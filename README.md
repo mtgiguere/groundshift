@@ -36,7 +36,7 @@ Groundshift launches with Arabica coffee (*Coffea arabica*) as its anchor crop, 
 - Its climate envelope is narrow and well-documented, making it an ideal test case
 - The stress signals are already measurable — this is not a future problem
 
-Additional crop profiles (tea, cacao, maize) are included in the repository and follow the same pipeline.
+Additional crop profiles (tea, cacao, maize, wine grape, olive, wheat) are included in the repository and follow the same pipeline.
 
 ---
 
@@ -217,6 +217,9 @@ Groundshift ships with the following crop profiles. Each profile defines the com
 | Tea | Active | Darjeeling (origin), Kenya Highlands Kericho (production), Assam Brahmaputra (stress) |
 | Cacao | Active | Côte d'Ivoire Southwest (origin), Ghana Ashanti (production), Central Sulawesi (stress) |
 | Maize | Active | Iowa Corn Belt (origin), Ethiopia Jimma/Wolega (production), NE Brazil Nordeste (stress) |
+| Wine Grape | Active | Bordeaux (origin), Mendoza Argentina (production), Guadalquivir Lowlands Spain (stress) |
+| Olive | Active | Levant / Galilee (origin), Sfax Tunisia (production), Jaén Province Spain (stress) |
+| Wheat | Active | Karacadağ Anatolia (origin), Punjab Pakistan (production), Rajasthan India (stress) |
 
 Adding a new crop requires only a YAML profile. See [PLUGIN.md](docs/PLUGIN.md) for the crop profile specification.
 
