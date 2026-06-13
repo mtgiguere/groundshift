@@ -6,12 +6,14 @@ from pydantic import BaseModel
 
 from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
+from groundshift.plugins.groundwater import GroundwaterPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
 
 _KNOWN_PLUGINS = [
     (FrostRiskPlugin, "frost_risk_min_temp_*.nc"),
     (DroughtStressPlugin, "drought_stress_precip_*.nc"),
     (HeatStressPlugin, "heat_stress_mean_temp_*.nc"),
+    (GroundwaterPlugin, "groundwater_tws_*.nc"),
 ]
 
 
