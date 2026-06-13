@@ -960,4 +960,4 @@ GROUNDSHIFT_API_PORT=8000
 | API + delivery | All core endpoints live: crops, regions, emerging, runs, packages (MBTiles download), transitions, plugins. Both offline formats complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). | ✓ Functional |
 | Climate threat plugins | FrostRiskPlugin (existential), DroughtStressPlugin (stress), HeatStressPlugin (stress) shipped. Auto-registration via `build_plugin_registry`. Ingest scripts for all three data pipelines complete. | ✓ Functional |
 | Additional plugins | Pest/disease, phenology, groundwater, land tenure, cooperative infrastructure | Planned |
-| Additional crops | Wine grape, olive, wheat profiles production-ready | Planned |
+| Additional crops | Wine grape, olive, wheat profiles shipped with calibration anchors and full structural validation | ✓ Functional |

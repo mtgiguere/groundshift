@@ -1,0 +1,47 @@
+crop_id: olive
+name: Olive
+scientific_name: Olea europaea
+
+climate_envelope:
+  thresholds:
+    mean_annual_temp_c:
+      viable_min: 10.0
+      optimal_min: 15.0
+      optimal_max: 20.0
+      viable_max: 26.0
+
+    annual_precipitation_mm:
+      viable_min: 200.0
+      optimal_min: 400.0
+      optimal_max: 700.0
+      viable_max: 900.0
+
+    altitude_m:
+      viable_min: 0.0
+      optimal_min: 0.0
+      optimal_max: 1000.0
+      viable_max: 1500.0
+
+frost_threshold_c: -7.0
+precip_viable_min_mm: 200.0
+precip_optimal_min_mm: 400.0
+heat_max_threshold_c: 40.0
+
+calibration_anchors:
+  - id: levant_origin
+    name: Levant — Galilee / Western Syria
+    role: origin_center
+    bbox: [35.0, 32.5, 37.5, 34.5]
+    notes: "Archaeological and genetic origin of cultivated olive. Some groves in this region are over 2000 years old. Declining scores are a direct signal of climate pressure on olive's ancestral home."
+
+  - id: sfax_tunisia
+    name: Tunisia — Sfax Region
+    role: production_reference
+    bbox: [9.5, 33.5, 11.0, 35.0]
+    notes: "Largest continuous olive grove landscape in the world. Major smallholder export zone. Scores should reflect the semi-arid climate that olive is well-adapted to."
+
+  - id: andalucia_interior
+    name: Andalucía Interior — Jaén Province
+    role: stress_reference
+    bbox: [-4.0, 37.2, -2.5, 38.5]
+    notes: "World's single largest olive-producing province by volume, but experiencing documented heat and drought intensification. Extended summer drought and heat events above 40°C increasingly frequent. High scores here indicate the model is underestimating heat stress for continental Mediterranean climates."
