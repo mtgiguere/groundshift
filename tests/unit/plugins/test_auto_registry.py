@@ -5,6 +5,7 @@ from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.groundwater import GroundwaterPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
+from groundshift.plugins.pest_disease import PestDiseasePlugin
 
 
 class TestEmptyDir:
@@ -93,15 +94,36 @@ class TestGroundwaterDetection:
         assert "groundwater" not in ids
 
 
+class TestPestDiseaseDetection:
+    def test_registers_pest_disease_when_file_present(self, tmp_path):
+        (tmp_path / "pest_disease_clr_ssp245_2040.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        ids = [p.metadata.plugin_id for p in registry.list_plugins()]
+        assert "pest_disease" in ids
+
+    def test_pest_disease_plugin_has_correct_type(self, tmp_path):
+        (tmp_path / "pest_disease_clr_ssp245_2040.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        plugin = registry.get("pest_disease")
+        assert isinstance(plugin, PestDiseasePlugin)
+
+    def test_no_pest_disease_files_no_registration(self, tmp_path):
+        (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        ids = [p.metadata.plugin_id for p in registry.list_plugins()]
+        assert "pest_disease" not in ids
+
+
 class TestAllPluginsDetected:
-    def test_all_four_registered_when_all_files_present(self, tmp_path):
+    def test_all_five_registered_when_all_files_present(self, tmp_path):
         (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
         (tmp_path / "drought_stress_precip_ssp245_2040.nc").touch()
         (tmp_path / "heat_stress_mean_temp_ssp245_2040.nc").touch()
         (tmp_path / "groundwater_tws_baseline.nc").touch()
+        (tmp_path / "pest_disease_clr_ssp245_2040.nc").touch()
         registry = build_plugin_registry(tmp_path)
         ids = {p.metadata.plugin_id for p in registry.list_plugins()}
-        assert ids == {"frost_risk", "drought_stress", "heat_stress", "groundwater"}
+        assert ids == {"frost_risk", "drought_stress", "heat_stress", "groundwater", "pest_disease"}
 
     def test_plugin_data_dir_propagated(self, tmp_path):
         (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
