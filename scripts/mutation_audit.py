@@ -53,6 +53,21 @@ _TARGETS: dict[Path, Path] = {
     Path("groundshift/plugins/heat_stress.py"): Path(
         "tests/unit/plugins/test_heat_stress_plugin.py"
     ),
+    Path("groundshift/plugins/groundwater.py"): Path(
+        "tests/unit/plugins/test_groundwater_plugin.py"
+    ),
+    Path("groundshift/plugins/pest_disease.py"): Path(
+        "tests/unit/plugins/test_pest_disease_plugin.py"
+    ),
+    Path("groundshift/plugins/phenology.py"): Path(
+        "tests/unit/plugins/test_phenology_plugin.py"
+    ),
+    Path("groundshift/plugins/cooperative_infra.py"): Path(
+        "tests/unit/plugins/test_cooperative_infra_plugin.py"
+    ),
+    Path("groundshift/plugins/land_tenure.py"): Path(
+        "tests/unit/plugins/test_land_tenure_plugin.py"
+    ),
 }
 
 # Operator substitutions: (find, replace).
