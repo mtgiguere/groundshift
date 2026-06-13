@@ -344,8 +344,8 @@ The following crop profiles are included:
 To run any crop, use its file stem as the `--crop` argument:
 
 ```bash
-groundshift run --crop tea --region kenya --phase describe
-groundshift run --crop cacao --region ghana --phase predict
+groundshift run --crop tea --region ethiopia --phase describe
+groundshift run --crop cacao --region colombia --phase predict
 groundshift run --crop maize --region ethiopia --phase prescribe
 ```
 
@@ -353,13 +353,15 @@ groundshift run --crop maize --region ethiopia --phase prescribe
 
 ### Available Regions
 
-To see all named regions the system can resolve:
+The currently supported region identifiers are:
 
-```bash
-# Regions are defined in groundshift/regions/resolver.py
-# Run any analysis with an unknown region to see the available list in the error message:
-groundshift run --crop coffee --region list_regions --phase describe
 ```
+ethiopia
+colombia
+central_america
+```
+
+These are defined in `groundshift/regions/resolver.py`. Passing any other value raises an `UnknownRegionError`. If you need a region that is not listed, open an issue on GitHub.
 
 ---
 

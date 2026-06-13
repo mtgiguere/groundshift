@@ -76,16 +76,22 @@ class GroundshiftPlugin(ABC):
         """
         Compute and return a SuitabilityModifier.
 
-        modifier_value: float in [-1.0, 1.0]
-            Positive = amplifies opportunity signal
-            Negative = suppresses suitability (stress or risk)
-            0.0 = no effect
+        factor_value: xr.DataArray, values in [0.0, 1.0]
+            Severity of the stressor at each grid cell.
+            0.0 = stressor eliminates viability entirely at that cell.
+            1.0 = stressor has no effect.
 
-        confidence: float in [0.0, 1.0]
-            How much trust to give this modifier.
+        probability: xr.DataArray, values in [0.0, 1.0]
+            Likelihood the stressor occurs at each cell this season/horizon.
+
+        confidence: xr.DataArray, values in [0.0, 1.0]
+            Certainty of both the factor and probability estimates.
             Use lower values when data is sparse or methodology is uncertain.
             Be honest — a low-confidence modifier with correct sign is
             more useful than an overconfident wrong one.
+
+        All three must be xr.DataArray grids. Uniform spatial coverage is fine:
+            xr.DataArray(np.array([[0.8]]))
         """
 
     @abstractmethod
@@ -131,6 +137,12 @@ class PluginMetadata:
     requires_network: bool      # True if fetch_data calls external APIs
     phase_applicability: list[str]  # ["describe", "predict", "prescribe"]
                                     # Which phases this plugin is meaningful for
+    threat_tier: str            # "existential" | "stress" | "custom"
+                                # existential: hard ceiling — if P(stressor) * (1 - factor) > 0
+                                #   reduces score to 0 regardless of climate envelope
+                                # stress: multiplicative — score *= factor * probability
+                                # custom: weighted blend — requires custom_weight
+    custom_weight: float | None = None  # Required when threat_tier is "custom"
 ```
 
 ### BoundingBox
@@ -312,13 +324,14 @@ class GroundwaterPlugin(GroundshiftPlugin):
 
     def describe(self, score: SuitabilityModifier) -> str:
         anomaly = score.metadata.get("anomaly_cm", 0)
-        if score.modifier_value < -0.5:
+        mean_factor = float(score.factor_value.mean())
+        if mean_factor < 0.5:
             return (
                 f"Severe groundwater depletion detected in this region "
                 f"(GRACE anomaly: {anomaly:.1f}cm below baseline). "
                 f"Irrigation-dependent cultivation faces significant long-term water risk."
             )
-        elif score.modifier_value < -0.2:
+        elif mean_factor < 0.8:
             return (
                 f"Moderate groundwater stress detected (GRACE anomaly: {anomaly:.1f}cm). "
                 f"Water availability should be verified before investment decisions."
@@ -451,37 +464,30 @@ emergence_criteria:
 
 ## Plugin Registry
 
-To register your plugin, add it to `groundshift/plugins/registry.py`:
+Plugins register automatically based on whether their data files are present in `data/plugin_data/`. There is no manual registration step and no configuration file to edit.
+
+The registration logic lives in `groundshift/plugins/auto_registry.py`:
 
 ```python
-from groundshift.plugins.stretch.groundwater.plugin import GroundwaterPlugin
-
-PLUGIN_REGISTRY: dict[str, type[GroundshiftPlugin]] = {
-    # Builtin — always available
-    "climate_envelope":   ClimateEnvelopePlugin,
-    "imagery":            ImageryPlugin,
-
-    # Stretch — opt-in
-    "frost_risk":         FrostRiskPlugin,
-    "pest_disease":       PestDiseasePlugin,
-    "groundwater":        GroundwaterPlugin,       # ← add yours here
-    "phenology":          PhenologyPlugin,
-    "land_tenure":        LandTenurePlugin,
-    "cooperative_infra":  CooperativeInfraPlugin,
-}
+def build_plugin_registry(plugin_data_dir: Path) -> PluginRegistry:
+    registry = PluginRegistry()
+    if any(plugin_data_dir.glob("frost_risk_min_temp_*.nc")):
+        registry.register(FrostRiskPlugin(plugin_data_dir))
+    if any(plugin_data_dir.glob("drought_stress_precip_*.nc")):
+        registry.register(DroughtStressPlugin(plugin_data_dir))
+    if any(plugin_data_dir.glob("heat_stress_mean_temp_*.nc")):
+        registry.register(HeatStressPlugin(plugin_data_dir))
+    return registry
 ```
 
-Activate a plugin for an analysis run by including it in your run config or `.env`:
+To ship a new plugin:
 
-```bash
-GROUNDSHIFT_PLUGINS=climate_envelope,imagery,groundwater
+1. Implement `GroundshiftPlugin` and place the file in `groundshift/plugins/`
+2. Define a sentinel file pattern that uniquely matches your plugin's data files (e.g. `my_plugin_variable_*.nc`)
+3. Add a glob check for that pattern in `build_plugin_registry`
+4. Run `scripts/prepare_plugin_data.py` (or your own ingest script) to place data files in `data/plugin_data/`
 
-# or via CLI
-python -m groundshift run \
-  --crop coffee \
-  --region ethiopia \
-  --plugins climate_envelope imagery groundwater
-```
+The plugin fires automatically on the next run. No env vars, no flags, no restarts required.
 
 ---
 
@@ -503,15 +509,15 @@ def test_validate_config_returns_true_for_all_crops():
     ]:
         assert plugin.validate_config(profile) is True
 
-def test_score_returns_modifier_in_valid_range(mock_layer_data, coffee_profile):
+def test_score_returns_factor_value_in_unit_range(mock_layer_data, coffee_profile):
     plugin = GroundwaterPlugin()
     result = plugin.score(mock_layer_data, coffee_profile)
-    assert -1.0 <= result.modifier_value <= 1.0
+    assert 0.0 <= float(result.factor_value.min()) <= float(result.factor_value.max()) <= 1.0
 
-def test_score_returns_confidence_in_valid_range(mock_layer_data, coffee_profile):
+def test_score_returns_confidence_in_unit_range(mock_layer_data, coffee_profile):
     plugin = GroundwaterPlugin()
     result = plugin.score(mock_layer_data, coffee_profile)
-    assert 0.0 <= result.confidence <= 1.0
+    assert 0.0 <= float(result.confidence.min()) <= float(result.confidence.max()) <= 1.0
 
 def test_describe_returns_nonempty_string(mock_modifier):
     plugin = GroundwaterPlugin()
@@ -519,13 +525,16 @@ def test_describe_returns_nonempty_string(mock_modifier):
     assert isinstance(result, str) and len(result) > 0
 
 def test_describe_is_human_readable_for_severe_depletion():
+    import numpy as np
+    import xarray as xr
     plugin = GroundwaterPlugin()
     modifier = SuitabilityModifier(
         plugin_id="groundwater",
-        modifier_value=-0.8,
-        confidence=0.7,
-        metadata={"anomaly_cm": -42.0, "record_years": 15},
-        # ... other fields
+        region=SOME_REGION,
+        factor_value=xr.DataArray(np.array([[0.2]])),   # severe depletion → low factor
+        probability=xr.DataArray(np.array([[1.0]])),
+        confidence=xr.DataArray(np.array([[0.7]])),
+        metadata={"anomaly_cm": -42.0, "record_years": 15, "threat_tier": "stress"},
     )
     description = plugin.describe(modifier)
     # Should not contain raw numbers as the primary message
@@ -544,10 +553,11 @@ pytest tests/unit/plugins/test_groundwater_plugin.py -v
 
 The following plugins have been identified as high-value and are available for community development. Each has an open GitHub issue with more detail.
 
+The following plugins have been identified as high-value. Shipped plugins (frost risk, drought stress, heat stress) are not listed here — see [ARCHITECTURE.md](ARCHITECTURE.md) for the shipped plugin index.
+
 | Plugin ID | Description | Primary Data Source | Crops | Priority |
 |---|---|---|---|---|
 | `pest_disease` | Climate-driven range expansion of crop pathogens — coffee leaf rust, grapevine downy mildew, wheat blast | CABI CPC, FAO EMPRES | coffee, wine_grape, wheat | High |
-| `frost_risk` | Late frost event frequency and trend from daily temperature data | ERA5 daily, GHCND station data | wine_grape, olive, coffee | High |
 | `phenology` | Flowering and harvest timing shifts from MODIS/Sentinel time series | MODIS MCD12Q2, Sentinel-2 | coffee, wine_grape | Medium |
 | `groundwater` | Aquifer depletion from GRACE satellite gravity anomalies | NASA GRACE-FO | wheat, olive | Medium |
 | `land_tenure` | Land ownership type context for prescribe-phase recommendations | FAO Land Tenure data, national cadasters | all | Medium |

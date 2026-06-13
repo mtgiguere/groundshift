@@ -36,7 +36,7 @@ Groundshift launches with Arabica coffee (*Coffea arabica*) as its anchor crop, 
 - Its climate envelope is narrow and well-documented, making it an ideal test case
 - The stress signals are already measurable — this is not a future problem
 
-Additional crop profiles (wine grape, olive, wheat, cocoa, tea) are included in the repository and follow the same pipeline.
+Additional crop profiles (tea, cacao, maize) are included in the repository and follow the same pipeline.
 
 ---
 
@@ -353,5 +353,12 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | REST API — GET /api/v1/packages, GET /api/v1/packages/{crop_id}/{region_id} (streams MBTiles) | ✓ Complete |
 | REST API — GET /api/v1/crops/{id}/transitions (Jaccard envelope overlap ranking) | ✓ Complete |
 | KMZ export script (`scripts/export_kmz.py` — CivTAK polygon overlay, stdlib only) | ✓ Complete |
+| FrostRiskPlugin (CMIP6 tasmin → frost event frequency → existential modifier) | ✓ Complete |
+| DroughtStressPlugin (CMIP6 precip → drought stress → stress modifier) | ✓ Complete |
+| HeatStressPlugin (CMIP6 tas → heat stress → stress modifier) | ✓ Complete |
+| Plugin auto-registry (`build_plugin_registry` — data-presence-based wiring, zero config) | ✓ Complete |
+| Plugin data ingest (`scripts/ingest/download_cmip6_tasmin.py`, `scripts/prepare_plugin_data.py`) | ✓ Complete |
+| Mutation audit script (`scripts/mutation_audit.py` — operator-flip survivor reporting) | ✓ Complete |
+| REST API — GET /api/v1/plugins (availability status for all known plugins) | ✓ Complete |
 
 *Built with the belief that information equity is a precondition for climate adaptation justice.*
