@@ -59,9 +59,7 @@ _TARGETS: dict[Path, Path] = {
     Path("groundshift/plugins/pest_disease.py"): Path(
         "tests/unit/plugins/test_pest_disease_plugin.py"
     ),
-    Path("groundshift/plugins/phenology.py"): Path(
-        "tests/unit/plugins/test_phenology_plugin.py"
-    ),
+    Path("groundshift/plugins/phenology.py"): Path("tests/unit/plugins/test_phenology_plugin.py"),
     Path("groundshift/plugins/cooperative_infra.py"): Path(
         "tests/unit/plugins/test_cooperative_infra_plugin.py"
     ),
