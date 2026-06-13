@@ -7,6 +7,7 @@ from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.groundwater import GroundwaterPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
 from groundshift.plugins.pest_disease import PestDiseasePlugin
+from groundshift.plugins.phenology import PhenologyPlugin
 
 
 class TestEmptyDir:
@@ -135,14 +136,35 @@ class TestCooperativeInfraDetection:
         assert "cooperative_infra" not in ids
 
 
+class TestPhenologyDetection:
+    def test_registers_phenology_when_file_present(self, tmp_path):
+        (tmp_path / "phenology_gdd_ssp245_2040.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        ids = [p.metadata.plugin_id for p in registry.list_plugins()]
+        assert "phenology" in ids
+
+    def test_phenology_plugin_has_correct_type(self, tmp_path):
+        (tmp_path / "phenology_gdd_ssp245_2040.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        plugin = registry.get("phenology")
+        assert isinstance(plugin, PhenologyPlugin)
+
+    def test_no_phenology_files_no_registration(self, tmp_path):
+        (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        ids = [p.metadata.plugin_id for p in registry.list_plugins()]
+        assert "phenology" not in ids
+
+
 class TestAllPluginsDetected:
-    def test_all_six_registered_when_all_files_present(self, tmp_path):
+    def test_all_seven_registered_when_all_files_present(self, tmp_path):
         (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
         (tmp_path / "drought_stress_precip_ssp245_2040.nc").touch()
         (tmp_path / "heat_stress_mean_temp_ssp245_2040.nc").touch()
         (tmp_path / "groundwater_tws_baseline.nc").touch()
         (tmp_path / "pest_disease_clr_ssp245_2040.nc").touch()
         (tmp_path / "cooperative_infra_access.nc").touch()
+        (tmp_path / "phenology_gdd_ssp245_2040.nc").touch()
         registry = build_plugin_registry(tmp_path)
         ids = {p.metadata.plugin_id for p in registry.list_plugins()}
         assert ids == {
@@ -152,6 +174,7 @@ class TestAllPluginsDetected:
             "groundwater",
             "pest_disease",
             "cooperative_infra",
+            "phenology",
         }
 
     def test_plugin_data_dir_propagated(self, tmp_path):
