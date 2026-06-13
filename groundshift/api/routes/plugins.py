@@ -4,6 +4,7 @@ from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from groundshift.plugins.cooperative_infra import CooperativeInfraPlugin
 from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.groundwater import GroundwaterPlugin
@@ -16,6 +17,7 @@ _KNOWN_PLUGINS = [
     (HeatStressPlugin, "heat_stress_mean_temp_*.nc"),
     (GroundwaterPlugin, "groundwater_tws_*.nc"),
     (PestDiseasePlugin, "pest_disease_clr_*.nc"),
+    (CooperativeInfraPlugin, "cooperative_infra_access*.nc"),
 ]
 
 

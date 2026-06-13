@@ -1,6 +1,7 @@
 """Unit tests for build_plugin_registry — auto-detection from plugin data files."""
 
 from groundshift.plugins.auto_registry import build_plugin_registry
+from groundshift.plugins.cooperative_infra import CooperativeInfraPlugin
 from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.groundwater import GroundwaterPlugin
@@ -114,16 +115,44 @@ class TestPestDiseaseDetection:
         assert "pest_disease" not in ids
 
 
+class TestCooperativeInfraDetection:
+    def test_registers_cooperative_infra_when_file_present(self, tmp_path):
+        (tmp_path / "cooperative_infra_access.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        ids = [p.metadata.plugin_id for p in registry.list_plugins()]
+        assert "cooperative_infra" in ids
+
+    def test_cooperative_infra_plugin_has_correct_type(self, tmp_path):
+        (tmp_path / "cooperative_infra_access.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        plugin = registry.get("cooperative_infra")
+        assert isinstance(plugin, CooperativeInfraPlugin)
+
+    def test_no_cooperative_infra_files_no_registration(self, tmp_path):
+        (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        ids = [p.metadata.plugin_id for p in registry.list_plugins()]
+        assert "cooperative_infra" not in ids
+
+
 class TestAllPluginsDetected:
-    def test_all_five_registered_when_all_files_present(self, tmp_path):
+    def test_all_six_registered_when_all_files_present(self, tmp_path):
         (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
         (tmp_path / "drought_stress_precip_ssp245_2040.nc").touch()
         (tmp_path / "heat_stress_mean_temp_ssp245_2040.nc").touch()
         (tmp_path / "groundwater_tws_baseline.nc").touch()
         (tmp_path / "pest_disease_clr_ssp245_2040.nc").touch()
+        (tmp_path / "cooperative_infra_access.nc").touch()
         registry = build_plugin_registry(tmp_path)
         ids = {p.metadata.plugin_id for p in registry.list_plugins()}
-        assert ids == {"frost_risk", "drought_stress", "heat_stress", "groundwater", "pest_disease"}
+        assert ids == {
+            "frost_risk",
+            "drought_stress",
+            "heat_stress",
+            "groundwater",
+            "pest_disease",
+            "cooperative_infra",
+        }
 
     def test_plugin_data_dir_propagated(self, tmp_path):
         (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()

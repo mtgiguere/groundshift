@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from groundshift.plugins.cooperative_infra import CooperativeInfraPlugin
 from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
@@ -35,6 +36,12 @@ class TestDroughtStressCompatibility:
 class TestHeatStressCompatibility:
     def test_fires_for_all_profiles(self, profile, tmp_path):
         plugin = HeatStressPlugin(tmp_path)
+        assert plugin.validate_config(profile) is True
+
+
+class TestCooperativeInfraCompatibility:
+    def test_fires_for_all_profiles(self, profile, tmp_path):
+        plugin = CooperativeInfraPlugin(tmp_path)
         assert plugin.validate_config(profile) is True
 
 
