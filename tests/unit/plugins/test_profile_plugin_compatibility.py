@@ -9,6 +9,7 @@ from groundshift.plugins.cooperative_infra import CooperativeInfraPlugin
 from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
+from groundshift.plugins.land_tenure import LandTenurePlugin
 from groundshift.plugins.pest_disease import PestDiseasePlugin
 from groundshift.plugins.phenology import PhenologyPlugin
 
@@ -49,6 +50,12 @@ class TestCooperativeInfraCompatibility:
 class TestPhenologyCompatibility:
     def test_fires_for_all_profiles(self, profile, tmp_path):
         plugin = PhenologyPlugin(tmp_path)
+        assert plugin.validate_config(profile) is True
+
+
+class TestLandTenureCompatibility:
+    def test_fires_for_all_profiles(self, profile, tmp_path):
+        plugin = LandTenurePlugin(tmp_path)
         assert plugin.validate_config(profile) is True
 
 

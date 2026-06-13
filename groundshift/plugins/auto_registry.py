@@ -7,6 +7,7 @@ from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.groundwater import GroundwaterPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
+from groundshift.plugins.land_tenure import LandTenurePlugin
 from groundshift.plugins.pest_disease import PestDiseasePlugin
 from groundshift.plugins.phenology import PhenologyPlugin
 from groundshift.plugins.registry import PluginRegistry
@@ -36,5 +37,8 @@ def build_plugin_registry(plugin_data_dir: Path) -> PluginRegistry:
 
     if any(plugin_data_dir.glob("phenology_gdd_*.nc")):
         registry.register(PhenologyPlugin(plugin_data_dir))
+
+    if any(plugin_data_dir.glob("land_tenure_security*.nc")):
+        registry.register(LandTenurePlugin(plugin_data_dir))
 
     return registry
