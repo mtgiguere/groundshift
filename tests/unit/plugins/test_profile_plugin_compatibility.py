@@ -10,6 +10,7 @@ from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
 from groundshift.plugins.pest_disease import PestDiseasePlugin
+from groundshift.plugins.phenology import PhenologyPlugin
 
 _PROFILES_DIR = Path(__file__).parents[3] / "crop_profiles"
 _PROFILE_IDS = [p.stem for p in sorted(_PROFILES_DIR.glob("*.yaml"))]
@@ -42,6 +43,12 @@ class TestHeatStressCompatibility:
 class TestCooperativeInfraCompatibility:
     def test_fires_for_all_profiles(self, profile, tmp_path):
         plugin = CooperativeInfraPlugin(tmp_path)
+        assert plugin.validate_config(profile) is True
+
+
+class TestPhenologyCompatibility:
+    def test_fires_for_all_profiles(self, profile, tmp_path):
+        plugin = PhenologyPlugin(tmp_path)
         assert plugin.validate_config(profile) is True
 
 
