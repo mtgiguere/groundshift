@@ -58,7 +58,7 @@ Additional crop profiles (tea, cacao, maize, wine grape, olive, wheat) are inclu
 - **MBTiles export** — `scripts/export_mbtiles.py` converts any zone mask to a CivTAK-compatible MBTiles tile archive (zoom 4–10, TMS y-flip, configurable RGBA overlay colour)
 - **KMZ export** — `scripts/export_kmz.py` converts any zone mask to KMZ (ZIP-compressed KML); one Polygon placemark per zone cell, ABGR colour-coded; CivTAK native format for polygon overlays
 - **Opportunity zone identification with infrastructure context** — scoring against cooperative and market access layers (planned)
-- **Plugin architecture** — extensible evidence layers (pest/disease, frost risk, groundwater, land tenure) drop in without touching core logic
+- **Plugin architecture** — 8 shipped evidence layers (frost risk, drought stress, heat stress, pest/disease, phenology, groundwater, cooperative infrastructure, land tenure) drop in without touching core logic; auto-register on data file presence
 - **Confidence visualization** — uncertainty surfaces alongside every suitability output
 
 ---
@@ -229,19 +229,21 @@ Adding a new crop requires only a YAML profile. See [PLUGIN.md](docs/PLUGIN.md) 
 
 Groundshift is designed for extensibility. Evidence layers beyond the core climate envelope are implemented as plugins that drop into the pipeline without modifying core logic.
 
-**Shipped climate threat plugins:**
-- `frost_risk` — CMIP6 minimum temperature → annual frost probability (existential tier)
-- `drought_stress` — CMIP6 precipitation → drought stress probability (stress tier)
-- `heat_stress` — CMIP6 mean temperature → heat damage probability (stress tier)
+**Shipped plugins — describe phase (CMIP6-backed):**
+- `frost_risk` — minimum temperature → annual frost probability (existential tier)
+- `drought_stress` — precipitation deficit → drought stress factor (stress tier)
+- `heat_stress` — mean temperature exceedance → heat damage factor (stress tier)
+- `pest_disease` — CLR climate risk → Coffee Leaf Rust spread probability (existential tier; coffee only)
+- `phenology` — Growing Degree Day alignment with crop development window (stress tier)
 
-Plugins activate automatically when their data files exist in `data/plugin_data/`. No configuration change needed — run the ingest scripts and they fire on the next analysis.
+**Shipped plugins — observational baselines (single static file):**
+- `groundwater` — GRACE-FO Terrestrial Water Storage anomaly → aquifer depletion factor (stress tier)
 
-**Planned plugins:**
-- `pest_disease` — Coffee leaf rust, grapevine downy mildew, wheat blast range expansion
-- `groundwater` — GRACE aquifer depletion surfaces
-- `phenology` — MODIS/Sentinel flowering and harvest timing shifts
-- `land_tenure` — Ownership type context for prescribe-phase recommendations
-- `cooperative_infra` — Mill, processing, and export route accessibility scoring
+**Shipped plugins — prescribe phase (infrastructure and rights):**
+- `cooperative_infra` — OSM mill/processor proximity → market access score (stress tier)
+- `land_tenure` — PRINDEX property-rights index → tenure security score (stress tier)
+
+Plugins activate automatically when their data files exist in `data/plugin_data/`. No configuration change needed — run the corresponding ingest script and the plugin fires on the next analysis.
 
 See [PLUGIN.md](docs/PLUGIN.md) for complete plugin development documentation.
 
@@ -274,6 +276,9 @@ See [TDD_CONTRACT.md](TDD_CONTRACT.md) for the evidence base behind this discipl
 | Climate baseline (1970–2000) | WorldClim v2.1 | CC BY 4.0 | ✓ Integrated |
 | Recent observed climate (2015–present) | ERA5 (Copernicus/ECMWF) | Copernicus licence | ✓ Integrated |
 | Climate projections | CMIP6 (Pangeo/Google Cloud) | CC BY 4.0 | ✓ Integrated |
+| Groundwater storage anomaly | GRACE-FO (NASA Earthdata) | CC BY 4.0 | ✓ Integrated |
+| Infrastructure locations | OpenStreetMap (Overpass API) | ODbL | ✓ Integrated |
+| Land tenure security | PRINDEX (Property Rights Index) | CC BY 4.0 | ✓ Integrated |
 | Crop suitability baselines | FAO GAEZ v4 | CC BY-NC 4.0 | Planned |
 | Satellite imagery | Sentinel-2 (AWS Earth Search) | CC BY 4.0 | ✓ Integrated |
 | Historical NDVI trend | Landsat Collection 2 (AWS Earth Search) | Public domain | ✓ Integrated |
@@ -301,7 +306,7 @@ Open an issue before beginning significant work — coordination avoids duplicat
 
 ## Project Status
 
-Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces, detects opportunity and loss zones with dynamic confidence tiers (low/medium/high based on signal agreement across CMIP6, Landsat, and Sentinel-2), and ranks alternative crops by climate envelope overlap. The REST API covers crops, regions, emerging zones, runs, packages (MBTiles download), transition recommendations, and plugin availability. Both offline delivery formats for CivTAK are complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). Three climate threat plugins are shipped (frost risk, drought stress, heat stress) and auto-register when their CMIP6-derived data files are present. Four crop profiles active: coffee, tea, cacao, maize.
+Active development. The Describe, Predict, and Prescribe phases are complete and runnable end-to-end. Describe covers climate envelope scoring, calibration anchor monitoring, Sentinel-2 NDVI divergence, and Landsat historical trend detection. Predict covers CMIP6 projections under SSP2-4.5 and SSP5-8.5 through 2100. Prescribe computes signed delta surfaces, detects opportunity and loss zones with dynamic confidence tiers (low/medium/high based on signal agreement across CMIP6, Landsat, and Sentinel-2), and ranks alternative crops by climate envelope overlap. The REST API covers crops, regions, emerging zones, runs, packages (MBTiles download), transition recommendations, and plugin availability. Both offline delivery formats for CivTAK are complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). Eight plugins are shipped across three categories: CMIP6-backed describe-phase plugins (frost risk, drought stress, heat stress, pest/disease, phenology), an observational baseline plugin (groundwater via GRACE-FO), and prescribe-phase infrastructure plugins (cooperative infrastructure via OSM, land tenure via PRINDEX). All auto-register on data file presence. Seven crop profiles active: coffee (arabica), tea, cacao, maize, wine grape, olive, wheat.
 
 | Component | Status |
 |---|---|
@@ -359,8 +364,13 @@ Active development. The Describe, Predict, and Prescribe phases are complete and
 | FrostRiskPlugin (CMIP6 tasmin → frost event frequency → existential modifier) | ✓ Complete |
 | DroughtStressPlugin (CMIP6 precip → drought stress → stress modifier) | ✓ Complete |
 | HeatStressPlugin (CMIP6 tas → heat stress → stress modifier) | ✓ Complete |
-| Plugin auto-registry (`build_plugin_registry` — data-presence-based wiring, zero config) | ✓ Complete |
-| Plugin data ingest (`scripts/ingest/download_cmip6_tasmin.py`, `scripts/prepare_plugin_data.py`) | ✓ Complete |
+| GroundwaterPlugin (GRACE-FO TWS anomaly → aquifer depletion → stress modifier) | ✓ Complete |
+| PestDiseasePlugin (CLR climate risk → Coffee Leaf Rust probability → existential modifier; coffee only) | ✓ Complete |
+| PhenologyPlugin (CMIP6 GDD alignment → phenological synchrony → stress modifier) | ✓ Complete |
+| CooperativeInfraPlugin (OSM facility proximity → market access score → stress modifier; prescribe phase) | ✓ Complete |
+| LandTenurePlugin (PRINDEX property-rights index → tenure security score → stress modifier; prescribe phase) | ✓ Complete |
+| Plugin auto-registry (`build_plugin_registry` — data-presence-based wiring, zero config; 8 plugins) | ✓ Complete |
+| Plugin data ingest (`download_cmip6_tasmin.py`, `prepare_plugin_data.py`, `download_grace.py`, `download_pest_disease.py`, `download_phenology.py`, `download_cooperative_infra.py`, `download_land_tenure.py`) | ✓ Complete |
 | Mutation audit script (`scripts/mutation_audit.py` — operator-flip survivor reporting) | ✓ Complete |
 | REST API — GET /api/v1/plugins (availability status for all known plugins) | ✓ Complete |
 
