@@ -25,9 +25,9 @@ class TestPluginsList:
         r = client.get("/api/v1/plugins")
         assert "plugins" in r.json()
 
-    def test_total_is_three(self, client):
+    def test_total_is_four(self, client):
         r = client.get("/api/v1/plugins")
-        assert r.json()["total"] == 3
+        assert r.json()["total"] == 4
 
     def test_total_matches_list_length(self, client):
         r = client.get("/api/v1/plugins")
@@ -36,7 +36,7 @@ class TestPluginsList:
 
     def test_all_known_plugin_ids_present(self, client):
         ids = {p["plugin_id"] for p in client.get("/api/v1/plugins").json()["plugins"]}
-        assert ids == {"frost_risk", "drought_stress", "heat_stress"}
+        assert ids == {"frost_risk", "drought_stress", "heat_stress", "groundwater"}
 
     def test_each_plugin_has_required_fields(self, client):
         for plugin in client.get("/api/v1/plugins").json()["plugins"]:
@@ -79,12 +79,22 @@ class TestPluginAvailability:
         assert plugins["frost_risk"]["status"] == "unavailable"
         assert plugins["drought_stress"]["status"] == "unavailable"
 
+    def test_groundwater_available_when_file_present(self, tmp_path):
+        from groundshift.api.app import create_app
+
+        (tmp_path / "groundwater_tws_baseline.nc").touch()
+        c = TestClient(create_app(plugin_data_dir=tmp_path))
+        plugins = {p["plugin_id"]: p for p in c.get("/api/v1/plugins").json()["plugins"]}
+        assert plugins["groundwater"]["status"] == "available"
+        assert plugins["frost_risk"]["status"] == "unavailable"
+
     def test_all_available_when_all_files_present(self, tmp_path):
         from groundshift.api.app import create_app
 
         (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
         (tmp_path / "drought_stress_precip_ssp245_2040.nc").touch()
         (tmp_path / "heat_stress_mean_temp_ssp245_2040.nc").touch()
+        (tmp_path / "groundwater_tws_baseline.nc").touch()
         c = TestClient(create_app(plugin_data_dir=tmp_path))
         statuses = {p["plugin_id"]: p["status"] for p in c.get("/api/v1/plugins").json()["plugins"]}
         assert all(s == "available" for s in statuses.values())
