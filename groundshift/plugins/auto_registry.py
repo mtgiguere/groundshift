@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from groundshift.plugins.cooperative_infra import CooperativeInfraPlugin
 from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.groundwater import GroundwaterPlugin
@@ -28,5 +29,8 @@ def build_plugin_registry(plugin_data_dir: Path) -> PluginRegistry:
 
     if any(plugin_data_dir.glob("pest_disease_clr_*.nc")):
         registry.register(PestDiseasePlugin(plugin_data_dir))
+
+    if any(plugin_data_dir.glob("cooperative_infra_access*.nc")):
+        registry.register(CooperativeInfraPlugin(plugin_data_dir))
 
     return registry
