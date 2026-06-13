@@ -132,16 +132,15 @@ groundshift/
 │   ├── plugins/
 │   │   ├── base.py                      # ✓ GroundshiftPlugin ABC (5-method contract)
 │   │   ├── registry.py                  # ✓ register, get, list_plugins; duplicate guard
-│   │   ├── auto_registry.py             # ✓ build_plugin_registry(plugin_data_dir) — globs for data files, registers present plugins
-│   │   ├── frost_risk.py                # ✓ FrostRiskPlugin — existential tier; CMIP6 min-temp → annual frost probability
-│   │   ├── drought_stress.py            # ✓ DroughtStressPlugin — stress tier; CMIP6 precipitation → drought probability
-│   │   ├── heat_stress.py               # ✓ HeatStressPlugin — stress tier; CMIP6 mean-temp → heat damage probability
-│   │   └── stretch/                     # Future modifier plugins
-│   │       ├── pest_disease/            # Planned
-│   │       ├── groundwater/             # Planned
-│   │       ├── phenology/               # Planned
-│   │       ├── land_tenure/             # Planned
-│   │       └── cooperative_infra/       # Planned
+│   │   ├── auto_registry.py             # ✓ build_plugin_registry(plugin_data_dir) — globs for 8 data file patterns
+│   │   ├── frost_risk.py                # ✓ FrostRiskPlugin — existential; CMIP6 min-temp → frost probability
+│   │   ├── drought_stress.py            # ✓ DroughtStressPlugin — stress; CMIP6 precip → drought factor
+│   │   ├── heat_stress.py               # ✓ HeatStressPlugin — stress; CMIP6 mean-temp → heat factor
+│   │   ├── groundwater.py               # ✓ GroundwaterPlugin — stress; GRACE-FO TWS anomaly → depletion factor
+│   │   ├── pest_disease.py              # ✓ PestDiseasePlugin — existential; CLR climate risk → rust probability (coffee only)
+│   │   ├── phenology.py                 # ✓ PhenologyPlugin — stress; CMIP6 GDD alignment → synchrony factor
+│   │   ├── cooperative_infra.py         # ✓ CooperativeInfraPlugin — stress; OSM proximity → market access (prescribe)
+│   │   └── land_tenure.py               # ✓ LandTenurePlugin — stress; PRINDEX → tenure security score (prescribe)
 │   │
 │   ├── models/
 │   │   ├── bounding_box.py              # ✓ WGS84 bounding box with validation
@@ -176,13 +175,14 @@ groundshift/
 │   └── cli.py                           # ✓ run_describe + run_predict + run_prescribe; groundshift run --phase describe|predict|prescribe
 │
 ├── crop_profiles/
-│   ├── coffee_arabica.yaml              # ✓ Arabica thresholds (temp, precipitation, altitude)
+│   ├── coffee_arabica.yaml              # ✓ Arabica thresholds, calibration anchors, plugin keys
 │   ├── coffee.yaml                      # ✓ Alias for arabica (default --crop coffee CLI argument)
-│   ├── wine_grape.yaml
-│   ├── olive.yaml
-│   ├── wheat.yaml
-│   ├── cocoa.yaml                       # Stub
-│   └── tea.yaml                         # Stub
+│   ├── wine_grape.yaml                  # ✓ Vitis vinifera — Bordeaux/Mendoza/Guadalquivir anchors
+│   ├── olive.yaml                       # ✓ Olea europaea — Levant/Sfax/Jaén anchors
+│   ├── wheat.yaml                       # ✓ Triticum aestivum — Karacadağ/Punjab/Rajasthan anchors
+│   ├── maize.yaml                       # ✓ Zea mays — Iowa/Jimma/NE Brazil anchors
+│   ├── cacao.yaml                       # ✓ Theobroma cacao — Côte d'Ivoire/Ashanti/Sulawesi anchors
+│   └── tea.yaml                         # ✓ Camellia sinensis — Darjeeling/Kericho/Assam anchors
 │
 ├── tests/
 │   ├── unit/
@@ -232,7 +232,12 @@ groundshift/
 │       ├── download_sentinel2.py        # ✓ downloads Sentinel-2 NDVI composite via AWS Earth Search (free)
 │       ├── download_cmip6.py            # ✓ downloads CMIP6 projections via Pangeo/Google Cloud (free)
 │       ├── download_landsat.py          # ✓ downloads Landsat C2 L2 via AWS Earth Search, computes OLS trend (free)
-│       └── download_cmip6_tasmin.py     # ✓ downloads CMIP6 tasmin (min temp), K→°C, annual min, writes frost_risk_min_temp_*.nc
+│       ├── download_cmip6_tasmin.py     # ✓ downloads CMIP6 tasmin (min temp), K→°C, writes frost_risk_min_temp_*.nc
+│       ├── download_grace.py            # ✓ downloads GRACE-FO TWS via NASA Earthdata, writes groundwater_tws_baseline.nc
+│       ├── download_pest_disease.py     # ✓ derives CLR risk from CMIP6 temp+precip, writes pest_disease_clr_*.nc
+│       ├── download_phenology.py        # ✓ derives GDD grids from CMIP6 mean-temp, writes phenology_gdd_*.nc
+│       ├── download_cooperative_infra.py # ✓ queries OSM Overpass API, writes cooperative_infra_access.nc
+│       └── download_land_tenure.py      # ✓ normalises PRINDEX scores, writes land_tenure_security.nc
 │
 ├── infrastructure/
 │   └── aws/                             # Lambda, S3, RDS terraform/CDK
@@ -296,8 +301,7 @@ Each analysis run executes one or more phases in sequence. Phases share a common
 - `LossZoneDetector` is the mirror counterpart — cells currently above the suitability threshold but declining significantly. Same per-scenario+horizon boolean mask and same confidence tier logic, with signs flipped: Landsat must show negative slope, Sentinel-2 must show positive divergence.
 - `TransitionRecommender` takes the current crop profile and a list of candidate profiles and ranks them by Jaccard overlap of their viable climate ranges, averaged across all shared variables. Score of 1.0 means identical envelope; 0.0 means no overlap. This answers: *given that this region suits crop X, which alternatives have the most similar requirements?*
 - All three are wired into `run_prescribe`; the CLI prints opportunity zone counts, loss zone counts, and transition suggestions per scenario+horizon.
-
-Cooperative infrastructure context is next.
+- `CooperativeInfraPlugin` and `LandTenurePlugin` provide infrastructure and tenure context for prescribe-phase interpretation.
 
 **Inputs:**
 - Phase 1 and Phase 2 outputs (DescribeResult + PredictResult)
@@ -744,21 +748,40 @@ See [PLUGIN.md](PLUGIN.md) for the full plugin development guide.
 
 ### Shipped Plugins
 
-Three climate threat plugins are currently shipped. All require pre-processed NetCDF files in `data/plugin_data/` (see `scripts/prepare_plugin_data.py` and `scripts/ingest/download_cmip6_tasmin.py`).
+Eight plugins are shipped across three categories. All require NetCDF files in `data/plugin_data/`; run the corresponding ingest script to generate them.
 
-| Plugin | Tier | Data file pattern | Crop profile keys required |
+**CMIP6-backed describe-phase plugins** (scenario + horizon files: `_{scenario}_{horizon}.nc`):
+
+| Plugin | Tier | Data file pattern | Notes |
 |---|---|---|---|
-| `FrostRiskPlugin` | existential | `frost_risk_min_temp_{scenario}_{horizon}.nc` | `frost_threshold_c` (default `0.0`) |
-| `DroughtStressPlugin` | stress | `drought_stress_precip_{scenario}_{horizon}.nc` | `precip_viable_min_mm`, `precip_optimal_min_mm` |
-| `HeatStressPlugin` | stress | `heat_stress_mean_temp_{scenario}_{horizon}.nc` | `heat_max_threshold_c` |
+| `FrostRiskPlugin` | existential | `frost_risk_min_temp_*.nc` | `frost_threshold_c` from profile (default `0.0`) |
+| `DroughtStressPlugin` | stress | `drought_stress_precip_*.nc` | `precip_viable_min_mm`, `precip_optimal_min_mm` from profile |
+| `HeatStressPlugin` | stress | `heat_stress_mean_temp_*.nc` | `heat_max_threshold_c` from profile |
+| `PestDiseasePlugin` | existential | `pest_disease_clr_*.nc` | Coffee only (`validate_config` returns False for others); CLR risk derived from CMIP6 temp + precip |
+| `PhenologyPlugin` | stress | `phenology_gdd_*.nc` | GDD thresholds derived from `climate_envelope.thresholds.mean_annual_temp_c` in profile |
 
-**Scoring formulas:**
+**Observational baseline plugin** (single static file, scenario/horizon ignored):
 
-- Frost: `probability = ((threshold − min_temp) / 2.0).clip(0, 1)`, `factor_value = 0.0` (frost kills crop)
+| Plugin | Tier | Data file | Notes |
+|---|---|---|---|
+| `GroundwaterPlugin` | stress | `groundwater_tws_baseline.nc` | GRACE-FO TWS anomaly in cm; factor_value = 1 + TWS/50, clamped [0, 1] |
+
+**Prescribe-phase infrastructure plugins** (single static files, scenario/horizon ignored):
+
+| Plugin | Tier | Data file | Notes |
+|---|---|---|---|
+| `CooperativeInfraPlugin` | stress | `cooperative_infra_access.nc` | OSM facility proximity; exponential decay, 50km half-life |
+| `LandTenurePlugin` | stress | `land_tenure_security.nc` | PRINDEX score normalised 0–100 → 0–1 |
+
+**Scoring formulas (CMIP6 plugins):**
+
+- Frost: `probability = ((threshold − min_temp) / 2.0).clip(0, 1)`, `factor_value = 0.0` (existential — frost kills crop)
 - Drought: `probability = ((optimal_min − precip) / (optimal_min − viable_min)).clip(0, 1)`, `factor_value = 1 − probability`
 - Heat: `probability = ((mean_temp − threshold) / 5.0).clip(0, 1)`, `factor_value = 1 − probability`
+- Pest/disease: `factor_value = 0.0` (existential), `probability = clr_risk.clip(0, 1)` — CLR risk = temp_score × precip_score
+- Phenology: trapezoid over GDD thresholds derived from crop temperature envelope × 365; `probability = 1.0`
 
-**Crop profile threshold keys** live at the top level of each YAML file (not nested). All shipped profiles include these keys. Plugins whose required keys are missing from a profile skip that run via `validate_config` returning `False` — `FrostRiskPlugin` always returns `True`.
+**Crop profile threshold keys** live at the top level of each YAML file. All shipped profiles include `frost_threshold_c`, `precip_viable_min_mm`, `precip_optimal_min_mm`, `heat_max_threshold_c`. Plugins whose required keys are absent skip via `validate_config → False`.
 
 ### Auto-Registration
 
@@ -768,9 +791,14 @@ Plugins register themselves automatically. `build_plugin_registry(plugin_data_di
 from groundshift.plugins.auto_registry import build_plugin_registry
 
 registry = build_plugin_registry(Path("data/plugin_data"))
-# → FrostRiskPlugin registered if frost_risk_min_temp_*.nc exists
-# → DroughtStressPlugin registered if drought_stress_precip_*.nc exists
-# → HeatStressPlugin registered if heat_stress_mean_temp_*.nc exists
+# → FrostRiskPlugin        if frost_risk_min_temp_*.nc exists
+# → DroughtStressPlugin    if drought_stress_precip_*.nc exists
+# → HeatStressPlugin       if heat_stress_mean_temp_*.nc exists
+# → GroundwaterPlugin      if groundwater_tws_*.nc exists
+# → PestDiseasePlugin      if pest_disease_clr_*.nc exists
+# → PhenologyPlugin        if phenology_gdd_*.nc exists
+# → CooperativeInfraPlugin if cooperative_infra_access*.nc exists
+# → LandTenurePlugin       if land_tenure_security*.nc exists
 ```
 
 All CLI phase runners and `create_app()` call `build_plugin_registry(_PLUGIN_DATA_DIR)` automatically — no configuration change is needed to activate a plugin once its data files land in `data/plugin_data/`.
@@ -956,8 +984,8 @@ GROUNDSHIFT_API_PORT=8000
 |---|---|---|
 | Phase 1 — Describe | Complete. WorldClimSource + ERA5Source + Sentinel2Source + LandsatSource, DescribePhaseRunner, calibration anchor monitoring, NDVI divergence surface, Landsat historical trend surface, CLI `groundshift run --phase describe --source --imagery`. | ✓ Functional |
 | Phase 2 — Predict | Complete. CMIP6Source + PredictPhaseRunner + PredictResult, SSP2-4.5 and SSP5-8.5 scenarios, 2040/2060/2100 horizons, CLI `groundshift run --phase predict`. | ✓ Functional |
-| Phase 3 — Prescribe | Delta surfaces, opportunity zone detection, loss zone detection, and transition recommendations complete. `PrescribePhaseRunner` + `GainZoneDetector` + `LossZoneDetector` + `TransitionRecommender`; CLI prints gaining/losing cells, opportunity zone counts, loss zone counts, and ranked transition suggestions per scenario+horizon. Cooperative infrastructure context is next. | ✓ Mostly functional |
+| Phase 3 — Prescribe | Delta surfaces, opportunity zone detection, loss zone detection, and transition recommendations complete. `PrescribePhaseRunner` + `GainZoneDetector` + `LossZoneDetector` + `TransitionRecommender`; CLI prints gaining/losing cells, opportunity zone counts, loss zone counts, and ranked transition suggestions per scenario+horizon. Infrastructure and tenure context delivered via `CooperativeInfraPlugin` and `LandTenurePlugin`. | ✓ Functional |
 | API + delivery | All core endpoints live: crops, regions, emerging, runs, packages (MBTiles download), transitions, plugins. Both offline formats complete: `export_mbtiles.py` (raster tiles) and `export_kmz.py` (polygon overlays). | ✓ Functional |
-| Climate threat plugins | FrostRiskPlugin (existential), DroughtStressPlugin (stress), HeatStressPlugin (stress) shipped. Auto-registration via `build_plugin_registry`. Ingest scripts for all three data pipelines complete. | ✓ Functional |
-| Additional plugins | Pest/disease, phenology, groundwater, land tenure, cooperative infrastructure | Planned |
-| Additional crops | Wine grape, olive, wheat profiles shipped with calibration anchors and full structural validation | ✓ Functional |
+| Climate threat plugins | FrostRiskPlugin (existential), DroughtStressPlugin (stress), HeatStressPlugin (stress), PestDiseasePlugin (existential, coffee), PhenologyPlugin (stress). All auto-register via `build_plugin_registry`. | ✓ Functional |
+| Observational + infrastructure plugins | GroundwaterPlugin (GRACE-FO, stress), CooperativeInfraPlugin (OSM, stress, prescribe), LandTenurePlugin (PRINDEX, stress, prescribe). All auto-register. | ✓ Functional |
+| Additional crops | Wine grape, olive, wheat profiles shipped with calibration anchors and full structural validation. Seven crop profiles total. | ✓ Functional |
