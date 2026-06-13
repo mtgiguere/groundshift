@@ -9,6 +9,7 @@ from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.groundwater import GroundwaterPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
+from groundshift.plugins.land_tenure import LandTenurePlugin
 from groundshift.plugins.pest_disease import PestDiseasePlugin
 from groundshift.plugins.phenology import PhenologyPlugin
 
@@ -20,6 +21,7 @@ _KNOWN_PLUGINS = [
     (PestDiseasePlugin, "pest_disease_clr_*.nc"),
     (CooperativeInfraPlugin, "cooperative_infra_access*.nc"),
     (PhenologyPlugin, "phenology_gdd_*.nc"),
+    (LandTenurePlugin, "land_tenure_security*.nc"),
 ]
 
 

@@ -6,6 +6,7 @@ from groundshift.plugins.drought_stress import DroughtStressPlugin
 from groundshift.plugins.frost_risk import FrostRiskPlugin
 from groundshift.plugins.groundwater import GroundwaterPlugin
 from groundshift.plugins.heat_stress import HeatStressPlugin
+from groundshift.plugins.land_tenure import LandTenurePlugin
 from groundshift.plugins.pest_disease import PestDiseasePlugin
 from groundshift.plugins.phenology import PhenologyPlugin
 
@@ -156,8 +157,28 @@ class TestPhenologyDetection:
         assert "phenology" not in ids
 
 
+class TestLandTenureDetection:
+    def test_registers_land_tenure_when_file_present(self, tmp_path):
+        (tmp_path / "land_tenure_security.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        ids = [p.metadata.plugin_id for p in registry.list_plugins()]
+        assert "land_tenure" in ids
+
+    def test_land_tenure_plugin_has_correct_type(self, tmp_path):
+        (tmp_path / "land_tenure_security.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        plugin = registry.get("land_tenure")
+        assert isinstance(plugin, LandTenurePlugin)
+
+    def test_no_land_tenure_files_no_registration(self, tmp_path):
+        (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
+        registry = build_plugin_registry(tmp_path)
+        ids = [p.metadata.plugin_id for p in registry.list_plugins()]
+        assert "land_tenure" not in ids
+
+
 class TestAllPluginsDetected:
-    def test_all_seven_registered_when_all_files_present(self, tmp_path):
+    def test_all_eight_registered_when_all_files_present(self, tmp_path):
         (tmp_path / "frost_risk_min_temp_ssp245_2040.nc").touch()
         (tmp_path / "drought_stress_precip_ssp245_2040.nc").touch()
         (tmp_path / "heat_stress_mean_temp_ssp245_2040.nc").touch()
@@ -165,6 +186,7 @@ class TestAllPluginsDetected:
         (tmp_path / "pest_disease_clr_ssp245_2040.nc").touch()
         (tmp_path / "cooperative_infra_access.nc").touch()
         (tmp_path / "phenology_gdd_ssp245_2040.nc").touch()
+        (tmp_path / "land_tenure_security.nc").touch()
         registry = build_plugin_registry(tmp_path)
         ids = {p.metadata.plugin_id for p in registry.list_plugins()}
         assert ids == {
@@ -175,6 +197,7 @@ class TestAllPluginsDetected:
             "pest_disease",
             "cooperative_infra",
             "phenology",
+            "land_tenure",
         }
 
     def test_plugin_data_dir_propagated(self, tmp_path):

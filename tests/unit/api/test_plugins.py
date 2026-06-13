@@ -25,9 +25,9 @@ class TestPluginsList:
         r = client.get("/api/v1/plugins")
         assert "plugins" in r.json()
 
-    def test_total_is_seven(self, client):
+    def test_total_is_eight(self, client):
         r = client.get("/api/v1/plugins")
-        assert r.json()["total"] == 7
+        assert r.json()["total"] == 8
 
     def test_total_matches_list_length(self, client):
         r = client.get("/api/v1/plugins")
@@ -44,6 +44,7 @@ class TestPluginsList:
             "pest_disease",
             "cooperative_infra",
             "phenology",
+            "land_tenure",
         }
 
     def test_each_plugin_has_required_fields(self, client):
@@ -123,6 +124,15 @@ class TestPluginAvailability:
         assert plugins["phenology"]["status"] == "available"
         assert plugins["frost_risk"]["status"] == "unavailable"
 
+    def test_land_tenure_available_when_file_present(self, tmp_path):
+        from groundshift.api.app import create_app
+
+        (tmp_path / "land_tenure_security.nc").touch()
+        c = TestClient(create_app(plugin_data_dir=tmp_path))
+        plugins = {p["plugin_id"]: p for p in c.get("/api/v1/plugins").json()["plugins"]}
+        assert plugins["land_tenure"]["status"] == "available"
+        assert plugins["frost_risk"]["status"] == "unavailable"
+
     def test_all_available_when_all_files_present(self, tmp_path):
         from groundshift.api.app import create_app
 
@@ -133,6 +143,7 @@ class TestPluginAvailability:
         (tmp_path / "pest_disease_clr_ssp245_2040.nc").touch()
         (tmp_path / "cooperative_infra_access.nc").touch()
         (tmp_path / "phenology_gdd_ssp245_2040.nc").touch()
+        (tmp_path / "land_tenure_security.nc").touch()
         c = TestClient(create_app(plugin_data_dir=tmp_path))
         statuses = {p["plugin_id"]: p["status"] for p in c.get("/api/v1/plugins").json()["plugins"]}
         assert all(s == "available" for s in statuses.values())
