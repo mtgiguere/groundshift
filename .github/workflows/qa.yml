@@ -1,0 +1,29 @@
+name: QA
+
+# Delegates to the central reusable workflows in mtgiguere/qa_pipeline so this
+# repo's CI stays ~10 lines and inherits fleet-wide fixes automatically.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# CodeQL needs security-events: write; the caller's token scope caps the
+# reusable workflow, so grant it here.
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  python:
+    uses: mtgiguere/qa_pipeline/.github/workflows/python-qa.yml@main
+    with:
+      package-manager: pip
+      coverage-package: groundshift
+      enforce-coverage: false   # grace period — warn, don't fail, until settled
+
+  security:
+    uses: mtgiguere/qa_pipeline/.github/workflows/security-qa.yml@main
+    with:
+      codeql-languages: '["python"]'
